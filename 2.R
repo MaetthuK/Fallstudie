@@ -1,16 +1,18 @@
 ##############################################################################
-# KAPITEL 0) PDF -> PNG: Folien 1 und 2 extrahieren
+# KAPITEL 0) PDF -> PNG (Folie 1 und Folie 2 erzeugen)
 ##############################################################################
-# Falls du aus "Titelseite.pdf" (Seite 1) und "Workflow.pdf" (Seite 1) 
-# PNG-Dateien generieren willst.
+# Beschreibung:
+#  - Wandelt "Titelseite.pdf" (Seite 1) in "Folie1.png" um
+#  - Wandelt "Workflow.pdf" (Seite 1) in "Folie2.png" um
+#
+# Benötigtes Paket "pdftools" ggf. installieren: install.packages("pdftools")
+##############################################################################
 
-# Falls noch nicht installiert:
-# install.packages("pdftools")
-
+# --- 0.0) Pakete laden ------------------------------------------------------
 library(pdftools)
 library(here)
 
-# --- 0.1) Folie 1 -----------------------------------------------------------
+# --- 0.1) Folie 1 (Titelseite) ---------------------------------------------
 pdf_convert(
   pdf       = here::here("Titelseite.pdf"),  # Pfad zur PDF (mind. 1 Seite)
   pages     = 1,                             # Seite 1
@@ -18,8 +20,8 @@ pdf_convert(
   dpi       = 300
 )
 
-# --- 0.2) Folie 2 -----------------------------------------------------------
-# Falls "Workflow.pdf" nur 1 Seite hat, nimm pages=1
+# --- 0.2) Folie 2 (Workflow) -----------------------------------------------
+# Falls "Workflow.pdf" nur 1 Seite hat, verwende pages = 1
 pdf_convert(
   pdf       = here::here("Workflow.pdf"),    # Pfad zur PDF
   pages     = 1,                             # Seite 1
@@ -31,11 +33,15 @@ pdf_convert(
 ##############################################################################
 # KAPITEL A) Daten laden & Spalten umbenennen
 ##############################################################################
-# Lädt Trainings- und Testdaten und passt Spaltennamen an.
+# Beschreibung:
+#  - Lädt Trainings- und Testdaten
+#  - Passt die Spaltennamen an (z.B. für schönere Darstellungen in Plots)
+##############################################################################
 
+# --- A.0) Pakete laden ------------------------------------------------------
 library(here)
 
-# --- A.1) Daten einlesen ----------------------------------------------------
+# --- A.1) CSV-Daten einlesen -----------------------------------------------
 train_data <- read.csv(here::here("bloodtrain.csv"))
 test_data  <- read.csv(here::here("bloodtest.csv"))
 
@@ -62,27 +68,38 @@ colnames(test_data) <- c(
 ##############################################################################
 # KAPITEL B) Summary-Text einfangen (Folie 4)
 ##############################################################################
-# capture.output() sammelt die Konsolenausgabe von summary(...)
+# Beschreibung:
+#  - Erzeugt die Konsolenausgabe von summary() für Trainings- und Testdaten 
+#  - Speichert diese Texte in R-Objekten train_sum und test_sum
+##############################################################################
 
+# --- B.1) Summary-Ausgabe abfangen -----------------------------------------
 train_sum <- capture.output(summary(train_data))
 test_sum  <- capture.output(summary(test_data))
 
 
 ##############################################################################
-# KAPITEL C) Boxplot erzeugen & als Bild abfangen (Folie 6) ----
+# KAPITEL C) Boxplot erzeugen & als PNG abfangen (Folie 6)
 ##############################################################################
-# Boxplot, der den Hintergrund in #ffe6f7 hat und keinen weissen Rand zeigt.
+# Beschreibung:
+#  - Erstellt einen Boxplot (ggplot2), in dem alle relevanten numerischen
+#    Variablen (z-standardisiert) dargestellt werden
+#  - Hintergrundfarbe: #ffe6f7
+#  - Ergebnis wird als Base64-String (img_b64) gespeichert, um z.B. in HTML
+#    direkt eingebettet zu werden.
+##############################################################################
 
+# --- C.0) Pakete laden ------------------------------------------------------
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(base64enc)
 
-# --- C.1) Kennzeichnung der Datensaetze ---------------------------------------
+# --- C.1) Kennzeichnung der Datensätze (Train vs. Test) ---------------------
 train_data$Dataset <- "Train"
 test_data$Dataset  <- "Test"
 
-# --- C.2) Zusammenführen relevanter Spalten -----------------------------------
+# --- C.2) Zusammenführen relevanter Spalten in gemeinsamen df --------------
 df <- bind_rows(
   select(train_data, Dataset,
          `Anzahl Spenden`, Gesamtvolumen,
@@ -92,11 +109,11 @@ df <- bind_rows(
          `Monate Erste Spende`, `Monate Letzte Spende`)
 )
 
-# --- C.3) Skalieren (z-Standardisierung) --------------------------------------
+# --- C.3) Skalieren (z-Standardisierung) ------------------------------------
 df_scaled <- df %>%
   mutate(across(!Dataset, scale))
 
-# --- C.4) Long-Format ---------------------------------------------------------
+# --- C.4) Long-Format vorbereiten (für ggplot) ------------------------------
 df_long <- pivot_longer(
   df_scaled,
   cols      = c(
@@ -109,17 +126,17 @@ df_long <- pivot_longer(
   values_to = "Wert"
 )
 
-# --- C.5) Boxplot mit minimalem Weissraum (Folie 6)----------------------------
+# --- C.5) Boxplot erstellen -------------------------------------------------
 p <- ggplot(df_long, aes(x = Variable, y = Wert, fill = Dataset)) +
   geom_boxplot(
     notch         = TRUE,    # Kerben anzeigen
-    notchwidth    = 0.3,     # Breite der Kerben
-    outlier.shape = 21,      # Form der Ausreisser
-    alpha         = 0.7,     # Transparenz der Boxen
-    color         = "black", # Randfarbe der Boxen
-    size          = 1        # Dicke der Linien 
+    notchwidth    = 0.3,
+    outlier.shape = 21,      
+    alpha         = 0.7,
+    color         = "black",
+    size          = 1
   ) +
-  # Keine Achsen-Expansion => kein zusaetzlicher Leerraum
+  # Keine Achsen-Expansion => kein zusätzlicher Leerraum
   scale_y_continuous(expand = expansion(mult = c(0, 0))) +
   scale_x_discrete(expand = expansion(mult = c(0, 0))) +
   labs(
@@ -129,13 +146,12 @@ p <- ggplot(df_long, aes(x = Variable, y = Wert, fill = Dataset)) +
   ) +
   theme_minimal(base_size = 14) +
   theme(
-    # Hintergrund auf Folienfarbe #ffe6f7
     panel.background    = element_rect(fill = "#ffe6f7", color = NA),
     plot.background     = element_rect(fill = "#ffe6f7", color = NA),
     legend.background   = element_rect(fill = "#ffe6f7", color = NA),
     legend.key          = element_rect(fill = "#ffe6f7", color = NA),
     
-    # Überschrift Boxplot
+    # Überschrift
     plot.title          = element_text(
       color = "black", size = 18, face = "bold", hjust = 0.5 
     ),
@@ -145,74 +161,95 @@ p <- ggplot(df_long, aes(x = Variable, y = Wert, fill = Dataset)) +
     axis.text           = element_text(color = "black"),
     axis.title          = element_text(color = "black"),
     plot.margin         = margin(5, 20, 5, 20)
-    
   )
 
-# --- C.6) PNG-Datei erzeugen und Base64-String -------------------------------
-# bg = #ffe6f7 => PNG selbst hat keinen weissen Rand
+# --- C.6) PNG-Datei erzeugen & Base64-String abspeichern --------------------
 plotfile <- tempfile(fileext = ".png")
-
-# Alt (niedrige Auflösung):
-# png(plotfile, width = 1000, height = 500, res = 96, bg = "#ffe6f7")
 
 # Neu (A4 quer, 300 DPI):
 png(plotfile, width = 3508, height = 1500, res = 300, bg = "#ffe6f7")
-
 print(p)
 dev.off()
 
 img_b64 <- base64enc::dataURI(file = plotfile, mime = "image/png")
 
 
-
 ##############################################################################
 # KAPITEL D) Vergleich der Verteilungen (Train vs. Test) (Folie 7)
 ##############################################################################
+# Beschreibung:
+#  - Erzeugt vier Histogramme (monate letzte spende, anzahl spenden usw.)
+#  - Legt die vier Plots nebeneinander als Grid
+#  - Speichert sie als "Folie7_Vergleich_Train_Test.png"
+##############################################################################
 
-# Pakete laden
+# --- D.0) Pakete laden ------------------------------------------------------
 library(ggplot2)
 library(dplyr)
-library(gridExtra)
+library(gridExtra)  # ACHTUNG: wird für arrangeGrob() bzw. grid.arrange() benötigt
 library(here)
 
 # --- D.1) Histogramme für die Verteilungen erstellen ------------------------
 plot1 <- ggplot(df, aes(x = `Monate Letzte Spende`, fill = Dataset)) +
   geom_histogram(position = "dodge", bins = 20, alpha = 0.7, color = "black") +
-  labs(title = "Monate seit letzter Spende", x = "Monate", y = "Häufigkeit") +
+  labs(title = "Monate seit letzter Spende",
+       x = "Monate", y = "Häufigkeit") +
   scale_fill_manual(values = c("blue", "green")) +
   theme_minimal(base_size = 16)
 
 plot2 <- ggplot(df, aes(x = `Anzahl Spenden`, fill = Dataset)) +
   geom_histogram(position = "dodge", bins = 15, alpha = 0.7, color = "black") +
-  labs(title = "Anzahl Spenden", x = "Anzahl", y = "Häufigkeit") +
+  labs(title = "Anzahl Spenden",
+       x = "Anzahl", y = "Häufigkeit") +
   scale_fill_manual(values = c("blue", "green")) +
   theme_minimal(base_size = 16)
 
 plot3 <- ggplot(df, aes(x = Gesamtvolumen, fill = Dataset)) +
   geom_histogram(position = "dodge", bins = 20, alpha = 0.7, color = "black") +
-  labs(title = "Gesamtvolumen Spenden", x = "Volumen", y = "Häufigkeit") +
+  labs(title = "Gesamtvolumen Spenden",
+       x = "Volumen", y = "Häufigkeit") +
   scale_fill_manual(values = c("blue", "green")) +
   theme_minimal(base_size = 16)
 
 plot4 <- ggplot(df, aes(x = `Monate Erste Spende`, fill = Dataset)) +
   geom_histogram(position = "dodge", bins = 20, alpha = 0.7, color = "black") +
-  labs(title = "Monate seit erster Spende", x = "Monate", y = "Häufigkeit") +
+  labs(title = "Monate seit erster Spende",
+       x = "Monate", y = "Häufigkeit") +
   scale_fill_manual(values = c("blue", "green")) +
   theme_minimal(base_size = 16)
 
-# --- D.2) Plots direkt in R anzeigen -----------------------------------------
-grid.arrange(plot1, plot2, plot3, plot4, ncol = 2, top = "Vergleich der Verteilungen: Trainings- vs. Testdaten")
+# --- D.2) Histogramme in einem Grid anordnen --------------------------------
+combined_plot <- arrangeGrob(plot1, plot2, plot3, plot4,
+                             ncol = 2,
+                             top  = "Vergleich der Verteilungen: Trainings- vs. Testdaten")
 
-print("✅ Folie 7 erfolgreich erstellt & direkt in R angezeigt!")
+# --- D.3) Grid als PNG-Datei speichern --------------------------------------
+ggsave(
+  filename = here::here("Folie7_Vergleich_Train_Test.png"),
+  plot     = combined_plot,
+  width    = 10,
+  height   = 5,
+  dpi      = 300
+)
 
-
+print("✅ Folie 7 erfolgreich erstellt (Histogramm-Grid als PNG gespeichert!)")
 
 
 ##############################################################################
-# KAPITEL E) HTML-Seite mit 10 „Foliens“ (Abschnitten)
+# KAPITEL E) HTML-Seite mit 10 Folien/Slides erzeugen
 ##############################################################################
+# Beschreibung:
+#  - Baut ein kleines HTML-Dokument via htmltools
+#  - Jede „Folie“ wird als DIV mit einer spezifischen Hintergrundfarbe dargestellt
+#  - In Folie 4 werden train_sum und test_sum (Summary-Statistiken) ausgegeben
+#  - In Folie 6 wird der Boxplot (Base64 eingebettet) dargestellt
+#  - In Folie 7 wird "Folie7_Vergleich_Train_Test.png" eingefügt
+##############################################################################
+
+# --- E.0) Pakete laden ------------------------------------------------------
 library(htmltools)
 
+# --- E.1) HTML-Struktur definieren ------------------------------------------
 page <- tags$html(
   tags$head(
     tags$title("Foliensatz: Summary & Boxplot"),
@@ -326,14 +363,14 @@ page <- tags$html(
     # Folie 3
     tags$div(class = "slide slide3",
              tags$h1("Folie 3: ..."),
-             tags$p("Hier koennte ein weiterer Inhalt stehen.")
+             tags$p("Hier könnte ein weiterer Inhalt stehen.")
     ),
     
     # Folie 4
     tags$div(class = "slide slide4",
              tags$h1("Folie 4: Statistische Kennzahlen"),
              tags$h2("Trainingsdaten Zusammenfassung"),
-             tags$p("Mit 'summary' gewinnen wir einen statistischen Ueberblick."),
+             tags$p("Mit 'summary' gewinnen wir einen statistischen Überblick."),
              tags$div(
                class = "summary-block",
                tags$pre(paste(train_sum, collapse = "\n"))
@@ -349,7 +386,7 @@ page <- tags$html(
     # Folie 5
     tags$div(class = "slide slide5",
              tags$h1("Folie 5: ..."),
-             tags$p("Noch ein Platzhalter fuer weiteren Inhalt.")
+             tags$p("Noch ein Platzhalter für weiteren Inhalt.")
     ),
     
     # Folie 6
@@ -364,7 +401,7 @@ page <- tags$html(
                tags$strong("Erkenntnisse:"),
                tags$ul(
                  tags$li("Verteilungen der Variablen sind nicht sehr unterschiedlich (Train vs. Test)."),
-                 tags$li("Kerben der Boxen ueberlappen => Variabilitaet im Testdatensatz teils geringer.")
+                 tags$li("Kerben der Boxen überlappen => Variabilität im Testdatensatz teils geringer.")
                ),
                tags$br(),
                tags$strong("Schlussfolgerung:"),
@@ -374,23 +411,23 @@ page <- tags$html(
     
     # Folie 7
     tags$div(class = "slide slide7",
-              tags$h1("Folie 7: Vergleich der Verteilungen Test vs. Train"),
-              tags$img(
-              src = here::here("Folie7_Vergleich_Train_Test.png"),
-              style = "max-width: 100%; height: auto;"
-            ),
-            tags$div(
-              class = "violett-box",
-              tags$strong("Erkenntnisse:"),
-              tags$ul(
-                tags$li("Trainings- und Testdaten haben ähnliche Verteilungen."),
-                tags$li("Leichte Unterschiede in der Anzahl Spenden im Testset."),
-                tags$li("Gesamtvolumen im Testset etwas niedriger.")
-                        ),
-                        tags$br(),
-                        tags$strong("Schlussfolgerung:"),
-                        tags$p("Die Unterschiede könnten die Modellleistung beeinflussen.")
-                      )
+             tags$h1("Folie 7: Vergleich der Verteilungen Test vs. Train"),
+             tags$img(
+               src = here::here("Folie7_Vergleich_Train_Test.png"),
+               style = "max-width: 100%; height: auto;"
+             ),
+             tags$div(
+               class = "violett-box",
+               tags$strong("Erkenntnisse:"),
+               tags$ul(
+                 tags$li("Trainings- und Testdaten haben ähnliche Verteilungen."),
+                 tags$li("Leichte Unterschiede in der Anzahl Spenden im Testset."),
+                 tags$li("Gesamtvolumen im Testset etwas niedriger.")
+               ),
+               tags$br(),
+               tags$strong("Schlussfolgerung:"),
+               tags$p("Die Unterschiede könnten die Modellleistung beeinflussen.")
+             )
     ),
     
     # Folie 8
@@ -413,7 +450,12 @@ page <- tags$html(
   )
 )
 
+
 ##############################################################################
 # KAPITEL F) HTML-Seite anzeigen
 ##############################################################################
+# Beschreibung:
+#  - html_print(page) zeigt die erzeugte HTML-Seite sofort in RStudio/Browser an
+##############################################################################
+
 html_print(page)
