@@ -1,3 +1,10 @@
+# Variante A) mit list.files() und file.remove() (empfohlen):
+files <- list.files("C:/Users/matth/OneDrive/AB1_R Projekte aktuell/Fallstudie/Präsentation", full.names = TRUE)
+file.remove(files)
+
+# Variante B) via system(...) und Windows-CMD (mit *.* um auch .txt Dateien zu löschen):
+system('cmd /c "del /F /Q \"C:/Users/matth/OneDrive/AB1_R Projekte aktuell/Fallstudie/Präsentation\\*.*\""')
+
 ##############################################################################
 # SCRIPT FÜR PRÄSENTATION: Erzeugt Folien (*.png) im Ordner "Präsentation"
 ##############################################################################
@@ -34,7 +41,7 @@ library(pdftools)
 pdf_convert(
   pdf       = here::here("Titelseite.pdf"),                                # Quelle PDF-Datei
   pages     = 1,                                                           # Verwende Seite 1
-  filenames = file.path(presentation_dir, "Folie1.png"),                     # Ziel-Datei im Ordner "Präsentation"
+  filenames = file.path(presentation_dir, "1) Titelbild.png"),                     # Ziel-Datei im Ordner "Präsentation"
   dpi       = 300
 )
 
@@ -42,7 +49,7 @@ pdf_convert(
 pdf_convert(
   pdf       = here::here("Workflow.pdf"),                                  # Quelle PDF-Datei
   pages     = 1,                                                           # Verwende Seite 1
-  filenames = file.path(presentation_dir, "Folie2.png"),                     # Ziel-Datei im Ordner "Präsentation"
+  filenames = file.path(presentation_dir, "2) Workflow Diagramm.png"),                     # Ziel-Datei im Ordner "Präsentation"
   dpi       = 300
 )
 
@@ -84,10 +91,100 @@ colnames(test_data) <- c(
 # Beschreibung:
 #  - Speichert die Konsolenausgabe von summary() der Trainings- und Testdaten
 #    in den Objekten train_sum und test_sum.
-
 # --- B.1) Summary-Ausgabe abfangen -----------------------------------------
 train_sum <- capture.output(summary(train_data))
 test_sum  <- capture.output(summary(test_data))
+
+# --- B.2) Konsolenausgaben (optional, zum Debuggen) ------------------------
+print("✅ Summary-Statistiken erfolgreich eingefangen!")
+print("Trainingsdaten Zusammenfassung:")
+print(train_sum)
+print("Testdaten Zusammenfassung:")
+print(test_sum)
+
+# --- B.3) PNG-Folie "Statistische Kennzahlen" erstellen (A4 Quer) -----------
+# Wir erstellen einen strukturierten Frame mit Überschriften, zusammengefassten 
+# Datenblöcken und einem äußeren Seitenrahmen.
+
+library(grid)
+
+# Pfad zur PNG-Datei (A4 Quer: 297mm x 210mm)
+png_filename <- file.path(presentation_dir, "4) Summary_Statistische_Kennzahlen.png")
+
+# Öffne PNG-Gerät mit den spezifizierten Abmaßen und Auflösung
+png(filename = png_filename, width = 297, height = 210, units = "mm", res = 300)
+
+# Starte eine neue Seite und ziehe einen äußeren Rahmen, der die gesamte Seite umgibt.
+grid.newpage()
+grid.rect(gp = gpar(lwd = 3, col = "black"))  # äußerer Seitenrahmen
+
+# Definiere das Layout mittels grid.layout: 5 Zeilen für unterschiedliche Bereiche
+layout_heights <- unit(c(0.15, 0.1, 0.325, 0.1, 0.325), "npc")
+pushViewport(viewport(layout = grid.layout(nrow = 5, ncol = 1, heights = layout_heights)))
+
+# =============================================================================
+# Zeile 1: Titel
+# =============================================================================
+# Zeichne den Hintergrund für die gesamte A4-Seite (Hellgrün)
+grid.rect(x = 0.5, y = 0.5, width = 1, height = 1,
+      gp = gpar(fill = "#ccffcc", col = NA))
+
+# =============================================================================
+# Zeile 1: Titel mit einem dunkleren Hintergrund (präsentationswirksam)
+# =============================================================================
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1, width = 0.9))
+grid.rect(gp = gpar(fill = "#669966", col = "black", lwd = 2))
+grid.text("Statistische Kennzahlen", 
+      gp = gpar(fontsize = 24, fontface = "bold", col = "white"))
+popViewport()
+
+# =============================================================================
+# Zeile 2: Untertitel für Trainingsdaten
+# =============================================================================
+grid.text("Trainingsdaten Zusammenfassung", 
+      vp = viewport(layout.pos.row = 2, layout.pos.col = 1),
+      gp = gpar(fontsize = 16, fontface = "bold"))
+
+# =============================================================================
+# Zeile 3: Trainingsdaten Summary-Block mit rotem Hintergrund und schmalerer Breite
+# =============================================================================
+train_text <- paste(train_sum, collapse = "\n")
+pushViewport(viewport(layout.pos.row = 3, layout.pos.col = 1, width = 0.9))
+grid.rect(gp = gpar(fill = "#FFCCCC", col = "black", lwd = 2))
+grid.text(train_text, 
+      x = 0.5, y = 0.98, just = c("center", "top"),
+      gp = gpar(fontfamily = "Courier", fontsize = 10))
+popViewport()
+
+# =============================================================================
+# Zeile 4: Untertitel für Testdaten
+# =============================================================================
+grid.text("Testdaten Zusammenfassung", 
+      vp = viewport(layout.pos.row = 4, layout.pos.col = 1),
+      gp = gpar(fontsize = 16, fontface = "bold"))
+
+# =============================================================================
+# Zeile 5: Testdaten Summary-Block mit blauem Hintergrund und schmalerer Breite
+# =============================================================================
+test_text <- paste(test_sum, collapse = "\n")
+pushViewport(viewport(layout.pos.row = 5, layout.pos.col = 1, width = 0.9))
+grid.rect(gp = gpar(fill = "#CCCCFF", col = "black", lwd = 2))
+grid.text(test_text, 
+      x = 0.5, y = 0.98, just = c("center", "top"),
+      gp = gpar(fontfamily = "Courier", fontsize = 10))
+popViewport()
+
+# Beende den Layout-Viewport
+popViewport()
+
+# Schließe das Grafikgerät und speichere die PNG-Datei.
+dev.off()
+
+print("✅ PNG-Folie 'Statistische Kennzahlen' erfolgreich erstellt!")
+
+
+
+
 
 ##############################################################################
 # KAPITEL C) Boxplot erzeugen & als PNG speichern (Folie 6)
@@ -170,10 +267,15 @@ p <- ggplot(df_long, aes(x = Variable, y = Wert, fill = Dataset)) +
   )
 
 # --- C.6) Boxplot als PNG speichern (Folie 6) -------------------------------
-folie6_path <- file.path(presentation_dir, "Folie6.png")
-png(folie6_path, width = 3508, height = 1500, res = 300, bg = "#ffe6f7")  # A4 quer, 300 DPI
-print(p)
-dev.off()
+folie6_path <- file.path(presentation_dir, "6) Boxplot Vergleich_test_train.png")
+ggsave(
+  filename = folie6_path,
+  plot     = p,
+  width    = 10,
+  height   = 5,
+  dpi      = 1200,
+  bg       = "#ffe6f7"
+)
 
 ##############################################################################
 # KAPITEL D) Vergleich der Verteilungen (Train vs. Test) (Folie 7)
@@ -220,7 +322,7 @@ combined_plot <- arrangeGrob(plot1, plot2, plot3, plot4,
                              top  = "Vergleich der Verteilungen: Trainings- vs. Testdaten")
 
 # --- D.3) Grid als PNG-Datei speichern --------------------------------------
-folie7_path <- file.path(presentation_dir, "Folie7_Vergleich_Train_Test.png")
+folie7_path <- file.path(presentation_dir, "7) Histogramm Vergleich_train_test.png")
 ggsave(
   filename = folie7_path,
   plot     = combined_plot,
@@ -445,6 +547,11 @@ page <- tags$html(
     )
   )
 )
+
+
+
+
+
 
 ##############################################################################
 # KAPITEL F) HTML-Seite anzeigen
