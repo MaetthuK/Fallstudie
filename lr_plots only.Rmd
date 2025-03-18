@@ -25,12 +25,30 @@ library(pROC)
 ## 1.2 CSV-Dateien Anbindung
 Die Trainings- und Testdaten werden aus den entsprechenden CSV-Dateien eingelesen. Anschlie&szlig;end &uuml;berpr&uuml;fen wir stichprobenartig, ob die Daten korrekt geladen wurden.
 ```{r load-data}
-blood_train <- read.csv("bloodtrain.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
-blood_test  <- read.csv("bloodtest.csv",  header = TRUE, sep = ",", stringsAsFactors = FALSE)
+train_data <- read.csv("bloodtrain.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+test_data  <- read.csv("bloodtest.csv",  header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+colnames(train_data) <- c(
+  "ID",
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende",
+  "Spende Maerz 2007"
+)
+
+# --- A.3) Spaltennamen anpassen (Test) --------------------------------------
+colnames(test_data) <- c(
+  "ID",
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende"
+)
 
 # Erste Zeilen anzeigen
-head(blood_train)
-head(blood_test)
+head(train_data)
+head(test_data)
 ```
 
 # 2. Datenverständnis
@@ -38,21 +56,21 @@ head(blood_test)
 ## 2.1 Struktur & fehlende Werte
 Wir untersuchen die Struktur der Datens&auml;tze und pr&uuml;fen, ob NA-Werte vorhanden sind.
 ```{r data-structure}
-str(blood_train)
-str(blood_test)
+str(train_data)
+str(test_data)
 
 # Fehlende Werte pro Spalte
-colSums(is.na(blood_train))
-colSums(is.na(blood_test))
+colSums(is.na(train_data))
+colSums(is.na(test_data))
 ```
 
 ## 2.2 Duplikate prüfen
 Duplikate in den Trainingsdaten werden gesucht und ggf. angezeigt.
 ```{r duplicates}
-duplicated_rows <- duplicated(blood_train)
+duplicated_rows <- duplicated(train_data)
 if(any(duplicated_rows)) {
   print("Gefundene Duplikate:")
-  print(blood_train[duplicated_rows, ])
+  print(train_data[duplicated_rows, ])
 } else {
   print("Keine Duplikate gefunden.")
 }
@@ -63,11 +81,13 @@ if(any(duplicated_rows)) {
 ## 3.1 Plot der Zielvariable
 Ein schneller Barplot zur Verteilung der Zielvariable (angenommen, sie hei&szlig;t `SpendeMaerz2007`).
 ```{r target-barplot}
-ggplot(blood_train, aes(x = factor(SpendeMaerz2007))) +
+ggplot(train_data, aes(x = factor(`Spende Maerz 2007`))) +
   geom_bar(fill = "steelblue") +
   labs(title = "Verteilung der Zielvariable (Trainingsdaten)",
-       x = "SpendeMaerz2007 (0/1)",
-       y = "H&auml;ufigkeit")
+       x = "SpendeMaerz2007 (Nein/Ja)" +
+       # Achsenbeschriftung anstatt 01 bitte "Nein" und "Ja"
+       scale_x_discrete(labels = c("Nein", "Ja")),
+       y = "Häufigkeit")
 ```
 
 ## 3.2 Boxplots: Beispiel "Monate seit letzter Spende"
@@ -75,13 +95,13 @@ Hier gehen wir davon aus, dass im Datensatz die Variable `MonateLetzteSpende` (b
 Falls gewünscht, kannst Du &uuml;ber diesen Unterschied beispielsweise einen Boxplot f&uuml;r Trainings- und Testdaten erstellen.
 ```{r boxplots}
 # Trainingsdaten
-ggplot(blood_train, aes(y = MonateLetzteSpende)) +
+ggplot(train_data, aes(y = `Monate Letzte Spende`)) +
   geom_boxplot(fill = "steelblue") +
-  labs(title = "Boxplot MonateLetzteSpende - Trainingsdaten",
+  labs(title = "Boxplot Monate Letzte Spende - Trainingsdaten",
        y = "Monate seit letzter Spende")
 
 # Testdaten
-ggplot(blood_test, aes(y = MonateLetzteSpende)) +
+ggplot(test_data, aes(y = `Monate Letzte Spende`)) +
   geom_boxplot(fill = "orange") +
   labs(title = "Boxplot MonateLetzteSpende - Testdaten",
        y = "Monate seit letzter Spende")
@@ -90,13 +110,13 @@ ggplot(blood_test, aes(y = MonateLetzteSpende)) +
 ## 3.3 Histogramme: Anzahl Spenden
 Histogramme zur Darstellung der Verteilung des Pr&auml;diktors `AnzahlSpenden`.
 ```{r histograms}
-ggplot(blood_train, aes(x = AnzahlSpenden)) +
+ggplot(train_data, aes(x = `Anzahl Spenden`)) +
   geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
   labs(title = "Histogramm AnzahlSpenden (Train)",
        x = "Anzahl Spenden",
        y = "H&auml;ufigkeit")
 
-ggplot(blood_test, aes(x = AnzahlSpenden)) +
+ggplot(test_data, aes(x = `Anzahl Spenden`)) +
   geom_histogram(binwidth = 1, fill = "orange", color = "black") +
   labs(title = "Histogramm AnzahlSpenden (Test)",
        x = "Anzahl Spenden",
@@ -107,7 +127,7 @@ ggplot(blood_test, aes(x = AnzahlSpenden)) +
 Ein Pairs-Plot zeigt die Beziehungen zwischen den numerischen Variablen. Anschlie&szlig;end wird eine Korrelationsmatrix erstellt.
 ```{r pairs-corr}
 # Extrahiere numerische Spalten
-num_cols <- blood_train %>% select_if(is.numeric)
+num_cols <- train_data %>% select_if(is.numeric)
 
 # Pairs-Plot
 pairs(num_cols, main = "Pairs Plot - Trainingsdaten")
@@ -121,17 +141,52 @@ corrplot(cor_mat, method = "circle", type = "upper",
 # 4. Feature Engineering
 Erstelle einen neuen Pr&auml;diktor, z.B. die SpendenRate. Hier wird angenommen, dass man die Differenz zwischen `MonateLetzteSpende` und `MonateErsteSpende` berechnet (als Indikator f&uuml;r die Donation-Dauer).  
 Falls der Unterschied 0 ergeben sollte, ist ein entsprechender Schutz einzubauen.
-```{r feature-engineering}
-blood_train_clean <- blood_train %>%
-  mutate(MonateSeither = MonateLetzteSpende - MonateErsteSpende,
-         SpendenRate = ifelse(MonateSeither > 0, AnzahlSpenden / MonateSeither, NA))
+```{r feature-engineering, message=FALSE, warning=FALSE}
+# 1) Libraries laden (nur wenn noch nicht oben geschehen)
+library(tidyverse)
+library(ggplot2)
 
-# Verteilung des neuen Pr&auml;diktors checken
-ggplot(blood_train_clean, aes(x = SpendenRate)) +
+# 2) Einlesen und direkt umbenennen, damit keine Leerzeichen in den Spaltennamen vorkommen:
+train_data <- read.csv("bloodtrain.csv", 
+                       header = TRUE, 
+                       sep = ",", 
+                       stringsAsFactors = FALSE)
+
+colnames(train_data) <- c(
+  "ID",
+  "MonateLetzteSpende",
+  "AnzahlSpenden",
+  "Gesamtvolumen",
+  "MonateErsteSpende",
+  "SpendeMaerz2007"
+)
+
+# 3) Neuer Datensatz mit Feature Engineering
+train_data_clean <- train_data %>%
+  mutate(
+    # Berechnung: Dauer seit erster Spende MINUS Dauer seit letzter Spende
+    MonateSeither = MonateErsteSpende - MonateLetzteSpende,
+    # Nur wenn MonateSeither > 0, wird SpendenRate berechnet, sonst NA
+    SpendenRate   = ifelse(MonateSeither > 0,
+                           AnzahlSpenden / MonateSeither,
+                           NA_real_)
+  )
+
+# 4) Schneller Blick ins Ergebnis
+summary(train_data_clean$MonateSeither)
+summary(train_data_clean$SpendenRate)
+
+# 5) Plot: Histogramm des neuen Prädiktors "SpendenRate"
+ggplot(train_data_clean, aes(x = SpendenRate)) +
   geom_histogram(binwidth = 0.1, fill = "darkgreen", color = "black") +
-  labs(title = "Histogramm neuer Pr&auml;diktor: SpendenRate",
-       x = "SpendenRate",
-       y = "H&auml;ufigkeit")
+  labs(
+    title = "Histogramm neuer Prädiktor: SpendenRate",
+    x = "SpendenRate",
+    y = "Häufigkeit"
+  )
+
+
+
 ```
 
 # 5. Modell & Auswertung (Plotausgabe)
@@ -142,10 +197,10 @@ Wir passen ein Modell an, dass u.a. `AnzahlSpenden`, `MonateLetzteSpende` und de
 (Dabei muss die Zielvariable 0/1-codiert sein.)
 ```{r model}
 # Konvertiere Zielvariable in numerisch (bzw. Faktor), falls erforderlich
-blood_train_clean$SpendeMaerz2007 <- as.factor(blood_train_clean$SpendeMaerz2007)
+train_data_clean$SpendeMaerz2007 <- as.factor(train_data_clean$SpendeMaerz2007)
 
 glm_model <- glm(SpendeMaerz2007 ~ AnzahlSpenden + MonateLetzteSpende + SpendenRate,
-                 data = blood_train_clean,
+                 data = train_data_clean,
                  family = binomial)
 
 summary(glm_model)
@@ -155,16 +210,16 @@ summary(glm_model)
 Erstelle Vorhersagen f&uuml;r den Trainingsdatensatz, generiere eine Konfusionsmatrix und plotte die ROC-Kurve.
 ```{r model-evaluation}
 # Vorhersagewahrscheinlichkeit
-pred_train <- predict(glm_model, blood_train_clean, type = "response")
+pred_train <- predict(glm_model, train_data_clean, type = "response")
 # Klassifikation mit 0.5-Schwelle
 pred_class <- ifelse(pred_train > 0.5, 1, 0)
 
 # Konfusionsmatrix
-conf_matrix <- confusionMatrix(factor(pred_class), factor(blood_train_clean$SpendeMaerz2007))
+conf_matrix <- confusionMatrix(factor(pred_class), factor(train_data_clean$SpendeMaerz2007))
 print(conf_matrix)
 
 # ROC-Plot
-roc_obj <- roc(as.numeric(blood_train_clean$SpendeMaerz2007), pred_train)
+roc_obj <- roc(as.numeric(train_data_clean$SpendeMaerz2007), pred_train)
 plot(roc_obj, col = "blue", main = "ROC-Kurve - Logistische Regression (Train)")
 auc_value <- auc(roc_obj)
 cat("AUC: ", auc_value)

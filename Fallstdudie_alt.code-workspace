@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../Gridanalyse"
+		},
+		{
+			"path": "../Translator"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
