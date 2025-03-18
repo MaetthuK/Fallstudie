@@ -1,0 +1,174 @@
+---
+title: "LR Plots Only"
+author: "Dein Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# 1. Setup
+
+## 1.1 Packages and Libraries
+Stelle sicher, dass alle ben&ouml;tigten Libraries installiert und geladen sind. (Die Installation wird hier einmalig gezeigt, falls Du sie noch nicht installiert hast.)
+```{r install-packages, eval=FALSE}
+# install.packages(c("tidyverse", "ggplot2", "dplyr", "corrplot", "caret", "pROC"))
+```
+
+```{r load-libraries}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(caret)
+library(pROC)
+```
+
+## 1.2 CSV-Dateien Anbindung
+Die Trainings- und Testdaten werden aus den entsprechenden CSV-Dateien eingelesen. Anschlie&szlig;end &uuml;berpr&uuml;fen wir stichprobenartig, ob die Daten korrekt geladen wurden.
+```{r load-data}
+blood_train <- read.csv("bloodtrain.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+blood_test  <- read.csv("bloodtest.csv",  header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+# Erste Zeilen anzeigen
+head(blood_train)
+head(blood_test)
+```
+
+# 2. Datenverständnis
+
+## 2.1 Struktur & fehlende Werte
+Wir untersuchen die Struktur der Datens&auml;tze und pr&uuml;fen, ob NA-Werte vorhanden sind.
+```{r data-structure}
+str(blood_train)
+str(blood_test)
+
+# Fehlende Werte pro Spalte
+colSums(is.na(blood_train))
+colSums(is.na(blood_test))
+```
+
+## 2.2 Duplikate prüfen
+Duplikate in den Trainingsdaten werden gesucht und ggf. angezeigt.
+```{r duplicates}
+duplicated_rows <- duplicated(blood_train)
+if(any(duplicated_rows)) {
+  print("Gefundene Duplikate:")
+  print(blood_train[duplicated_rows, ])
+} else {
+  print("Keine Duplikate gefunden.")
+}
+```
+
+# 3. Explorative Datenanalyse
+
+## 3.1 Plot der Zielvariable
+Ein schneller Barplot zur Verteilung der Zielvariable (angenommen, sie hei&szlig;t `SpendeMaerz2007`).
+```{r target-barplot}
+ggplot(blood_train, aes(x = factor(SpendeMaerz2007))) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Verteilung der Zielvariable (Trainingsdaten)",
+       x = "SpendeMaerz2007 (0/1)",
+       y = "H&auml;ufigkeit")
+```
+
+## 3.2 Boxplots: Beispiel "Monate seit letzter Spende"
+Hier gehen wir davon aus, dass im Datensatz die Variable `MonateLetzteSpende` (bzw. in Kombination mit `MonateErsteSpende`) vorliegt.  
+Falls gewünscht, kannst Du &uuml;ber diesen Unterschied beispielsweise einen Boxplot f&uuml;r Trainings- und Testdaten erstellen.
+```{r boxplots}
+# Trainingsdaten
+ggplot(blood_train, aes(y = MonateLetzteSpende)) +
+  geom_boxplot(fill = "steelblue") +
+  labs(title = "Boxplot MonateLetzteSpende - Trainingsdaten",
+       y = "Monate seit letzter Spende")
+
+# Testdaten
+ggplot(blood_test, aes(y = MonateLetzteSpende)) +
+  geom_boxplot(fill = "orange") +
+  labs(title = "Boxplot MonateLetzteSpende - Testdaten",
+       y = "Monate seit letzter Spende")
+```
+
+## 3.3 Histogramme: Anzahl Spenden
+Histogramme zur Darstellung der Verteilung des Pr&auml;diktors `AnzahlSpenden`.
+```{r histograms}
+ggplot(blood_train, aes(x = AnzahlSpenden)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
+  labs(title = "Histogramm AnzahlSpenden (Train)",
+       x = "Anzahl Spenden",
+       y = "H&auml;ufigkeit")
+
+ggplot(blood_test, aes(x = AnzahlSpenden)) +
+  geom_histogram(binwidth = 1, fill = "orange", color = "black") +
+  labs(title = "Histogramm AnzahlSpenden (Test)",
+       x = "Anzahl Spenden",
+       y = "H&auml;ufigkeit")
+```
+
+## 3.4 Pairs-Plot & Korrelationsmatrix
+Ein Pairs-Plot zeigt die Beziehungen zwischen den numerischen Variablen. Anschlie&szlig;end wird eine Korrelationsmatrix erstellt.
+```{r pairs-corr}
+# Extrahiere numerische Spalten
+num_cols <- blood_train %>% select_if(is.numeric)
+
+# Pairs-Plot
+pairs(num_cols, main = "Pairs Plot - Trainingsdaten")
+
+# Korrelationsmatrix und corrplot
+cor_mat <- cor(num_cols, use = "complete.obs")
+corrplot(cor_mat, method = "circle", type = "upper", 
+         title = "Korrelation (Trainingsdaten)", tl.cex = 0.8, mar = c(0,0,1,0))
+```
+
+# 4. Feature Engineering
+Erstelle einen neuen Pr&auml;diktor, z.B. die SpendenRate. Hier wird angenommen, dass man die Differenz zwischen `MonateLetzteSpende` und `MonateErsteSpende` berechnet (als Indikator f&uuml;r die Donation-Dauer).  
+Falls der Unterschied 0 ergeben sollte, ist ein entsprechender Schutz einzubauen.
+```{r feature-engineering}
+blood_train_clean <- blood_train %>%
+  mutate(MonateSeither = MonateLetzteSpende - MonateErsteSpende,
+         SpendenRate = ifelse(MonateSeither > 0, AnzahlSpenden / MonateSeither, NA))
+
+# Verteilung des neuen Pr&auml;diktors checken
+ggplot(blood_train_clean, aes(x = SpendenRate)) +
+  geom_histogram(binwidth = 0.1, fill = "darkgreen", color = "black") +
+  labs(title = "Histogramm neuer Pr&auml;diktor: SpendenRate",
+       x = "SpendenRate",
+       y = "H&auml;ufigkeit")
+```
+
+# 5. Modell & Auswertung (Plotausgabe)
+Zum Abschluss wird ein einfaches logistisches Regressionsmodell gebaut und dessen Ergebnisse visualisiert.
+
+## 5.1 Logistisches Regressionsmodell
+Wir passen ein Modell an, dass u.a. `AnzahlSpenden`, `MonateLetzteSpende` und den neuen Pr&auml;diktor `SpendenRate` verwendet.  
+(Dabei muss die Zielvariable 0/1-codiert sein.)
+```{r model}
+# Konvertiere Zielvariable in numerisch (bzw. Faktor), falls erforderlich
+blood_train_clean$SpendeMaerz2007 <- as.factor(blood_train_clean$SpendeMaerz2007)
+
+glm_model <- glm(SpendeMaerz2007 ~ AnzahlSpenden + MonateLetzteSpende + SpendenRate,
+                 data = blood_train_clean,
+                 family = binomial)
+
+summary(glm_model)
+```
+
+## 5.2 Konfusionsmatrix und ROC-Plot
+Erstelle Vorhersagen f&uuml;r den Trainingsdatensatz, generiere eine Konfusionsmatrix und plotte die ROC-Kurve.
+```{r model-evaluation}
+# Vorhersagewahrscheinlichkeit
+pred_train <- predict(glm_model, blood_train_clean, type = "response")
+# Klassifikation mit 0.5-Schwelle
+pred_class <- ifelse(pred_train > 0.5, 1, 0)
+
+# Konfusionsmatrix
+conf_matrix <- confusionMatrix(factor(pred_class), factor(blood_train_clean$SpendeMaerz2007))
+print(conf_matrix)
+
+# ROC-Plot
+roc_obj <- roc(as.numeric(blood_train_clean$SpendeMaerz2007), pred_train)
+plot(roc_obj, col = "blue", main = "ROC-Kurve - Logistische Regression (Train)")
+auc_value <- auc(roc_obj)
+cat("AUC: ", auc_value)
+```
+
+# 6. Fazit
+Dies ist ein grober &Uuml;berblick &uuml;ber die Daten, das Feature Engineering und den Modellierungsprozess. Auf Basis der Plots k&ouml;nnen Hinweise zur Optimierung des Modells gewonnen werden.

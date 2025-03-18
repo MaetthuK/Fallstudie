@@ -1,8 +1,11 @@
-# Variante A) mit list.files() und file.remove() (empfohlen):
-files <- list.files("C:/Users/matth/OneDrive/AB1_R Projekte aktuell/Fallstudie/Präsentation", full.names = TRUE)
+# Variante A) mit list.files() und file.remove() (empfohlen)
+files <- list.files(
+  "C:/Users/matth/OneDrive/AB1_R Projekte aktuell/Fallstudie/Präsentation",
+  full.names = TRUE
+)
 file.remove(files)
 
-# Variante B) via system(...) und Windows-CMD (mit *.* um auch .txt Dateien zu löschen):
+# Variante B) via system(...) und Windows-CMD (mit *.* um auch .txt Dateien zu löschen)
 system('cmd /c "del /F /Q \"C:/Users/matth/OneDrive/AB1_R Projekte aktuell/Fallstudie/Präsentation\\*.*\""')
 
 ##############################################################################
@@ -125,53 +128,55 @@ pushViewport(viewport(layout = grid.layout(nrow = 5, ncol = 1, heights = layout_
 # =============================================================================
 # Zeile 1: Titel
 # =============================================================================
-# Zeichne den Hintergrund für die gesamte A4-Seite (Hellgrün)
-grid.rect(x = 0.5, y = 0.5, width = 1, height = 1,
-      gp = gpar(fill = "#ccffcc", col = NA))
-
-# =============================================================================
-# Zeile 1: Titel mit einem dunkleren Hintergrund (präsentationswirksam)
-# =============================================================================
-pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1, width = 0.9))
-grid.rect(gp = gpar(fill = "#669966", col = "black", lwd = 2))
 grid.text("Statistische Kennzahlen", 
-      gp = gpar(fontsize = 24, fontface = "bold", col = "white"))
-popViewport()
+  # Zeichne den Hintergrund für die gesamte A4-Seite (Hellgrün)
+  grid.rect(x = 0.5, y = 0.5, width = 1, height = 1,
+        gp = gpar(fill = "#ccffcc", col = NA))
 
-# =============================================================================
-# Zeile 2: Untertitel für Trainingsdaten
-# =============================================================================
-grid.text("Trainingsdaten Zusammenfassung", 
-      vp = viewport(layout.pos.row = 2, layout.pos.col = 1),
-      gp = gpar(fontsize = 16, fontface = "bold"))
+  # =============================================================================
+  # Zeile 1: Titel mit einem dunkleren Hintergrund (präsentationswirksam)
+  # =============================================================================
+  pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 1, width = 0.9))
+  grid.rect(gp = gpar(fill = "#669966", col = "black", lwd = 2))
+  grid.text("Statistische Kennzahlen", 
+        gp = gpar(fontsize = 24, fontface = "bold", col = "white"))
+  popViewport()
 
-# =============================================================================
-# Zeile 3: Trainingsdaten Summary-Block mit rotem Hintergrund und schmalerer Breite
-# =============================================================================
-train_text <- paste(train_sum, collapse = "\n")
-pushViewport(viewport(layout.pos.row = 3, layout.pos.col = 1, width = 0.9))
-grid.rect(gp = gpar(fill = "#FFCCCC", col = "black", lwd = 2))
-grid.text(train_text, 
-      x = 0.5, y = 0.98, just = c("center", "top"),
-      gp = gpar(fontfamily = "Courier", fontsize = 10))
-popViewport()
+  # =============================================================================
+  # Zeile 2: Untertitel für Trainingsdaten
+  # =============================================================================
+  grid.text("Trainingsdaten Zusammenfassung", 
+        vp = viewport(layout.pos.row = 2, layout.pos.col = 1),
+        gp = gpar(fontsize = 16, fontface = "bold"))
 
-# =============================================================================
-# Zeile 4: Untertitel für Testdaten
-# =============================================================================
-grid.text("Testdaten Zusammenfassung", 
-      vp = viewport(layout.pos.row = 4, layout.pos.col = 1),
-      gp = gpar(fontsize = 16, fontface = "bold"))
+  # =============================================================================
+  # Zeile 3: Trainingsdaten Summary-Block mit rotem Hintergrund und schmalerer Breite
+  # =============================================================================
+  train_text <- paste(train_sum, collapse = "\n")
+  pushViewport(viewport(layout.pos.row = 3, layout.pos.col = 1, width = 0.9))
+  grid.rect(gp = gpar(fill = "#FFCCCC", col = "black", lwd = 2))
+  grid.text(train_text, 
+        x = 0.5, y = 0.98, just = c("center", "top"),
+        gp = gpar(fontfamily = "Courier", fontsize = 10))
+  popViewport()
 
-# =============================================================================
-# Zeile 5: Testdaten Summary-Block mit blauem Hintergrund und schmalerer Breite
-# =============================================================================
-test_text <- paste(test_sum, collapse = "\n")
-pushViewport(viewport(layout.pos.row = 5, layout.pos.col = 1, width = 0.9))
-grid.rect(gp = gpar(fill = "#CCCCFF", col = "black", lwd = 2))
-grid.text(test_text, 
-      x = 0.5, y = 0.98, just = c("center", "top"),
-      gp = gpar(fontfamily = "Courier", fontsize = 10))
+  # =============================================================================
+  # Zeile 4: Untertitel für Testdaten
+  # =============================================================================
+  grid.text("Testdaten Zusammenfassung", 
+        vp = viewport(layout.pos.row = 4, layout.pos.col = 1),
+        gp = gpar(fontsize = 16, fontface = "bold"))
+
+  # =============================================================================
+  # Zeile 5: Testdaten Summary-Block mit blauem Hintergrund und schmalerer Breite
+  # =============================================================================
+  test_text <- paste(test_sum, collapse = "\n")
+  pushViewport(viewport(layout.pos.row = 5, layout.pos.col = 1, width = 0.9))
+  grid.rect(gp = gpar(fill = "#CCCCFF", col = "black", lwd = 2))
+  grid.text(test_text, 
+        x = 0.5, y = 0.98, just = c("center", "top"),
+        gp = gpar(fontfamily = "Courier", fontsize = 10))
+  popViewport()
 popViewport()
 
 # Beende den Layout-Viewport
