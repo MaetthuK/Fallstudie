@@ -586,6 +586,9 @@ html_print(page)
 message("✅ HTML-Foliensatz erzeugt & im Viewer angezeigt (ggf. RStudio-Viewer).")
 
 
+
+# Plots ----
+
 ##############################################################################
 # KAPITEL G) Zusätzlicher Plot nur im RStudio-Viewer
 ##############################################################################
@@ -604,3 +607,199 @@ barplot(
 )
 
 message("✅ Zusätzlicher Viewer-Plot (Barplot) wurde erstellt.")
+
+
+# 6.2 - Boxlplot vergleich Train vs. Test mit Notch. Train rot, Test blau
+par(mfrow = c(2, 2))
+
+# 1) Boxplot: Monate Letzte Spende
+boxplot(`Monate Letzte Spende` ~ Dataset, data = df,
+        notch = TRUE, col = c("red", "blue"),
+        main = "Monate Letzte Spende",
+        xlab = "Datensatz", ylab = "Wert")
+
+# 2) Boxplot: Anzahl Spenden
+boxplot(`Anzahl Spenden` ~ Dataset, data = df,
+        notch = TRUE, col = c("red", "blue"),
+        main = "Anzahl Spenden",
+        xlab = "Datensatz", ylab = "Wert")
+
+# 3) Boxplot: Gesamtvolumen
+boxplot(Gesamtvolumen ~ Dataset, data = df,
+        notch = TRUE, col = c("red", "blue"),
+        main = "Gesamtvolumen",
+        xlab = "Datensatz", ylab = "Wert")
+
+# 4) Boxplot: Monate Erste Spende
+boxplot(`Monate Erste Spende` ~ Dataset, data = df,
+        notch = TRUE, col = c("red", "blue"),
+        main = "Monate Erste Spende",
+        xlab = "Datensatz", ylab = "Wert")
+
+p
+
+##############################################################################
+# KAPITEL 6.3 - Histogramm-Vergleich Train vs. Test
+##############################################################################
+# Dieser Codeabschnitt erstellt mehrere Histogramme und ein Balkendiagramm
+# zum Vergleich der Trainings- und Testdaten, ganz ohne Shiny.
+
+# Voraussetzung:
+#   - Die Datensätze 'train_data' und 'test_data' sind bereits eingelesen.
+#   - Pakete dplyr, ggplot2 und gridExtra sind geladen.
+
+# 1) Datensätze kennzeichnen: "Train" vs. "Test"
+train <- train_data
+test  <- test_data
+train$Dataset <- "Train"
+test$Dataset  <- "Test"
+
+# 2) Zielvariable im Testdatensatz ergänzen (falls dort nicht vorhanden)
+if (!"Spende Maerz 2007" %in% colnames(test)) {
+  test[["Spende Maerz 2007"]] <- NA
+}
+
+# 3) Zusammenführen in einem Dataframe
+#    Wir verwenden nur die Spalten, die wir für die Plots benötigen.
+library(dplyr)  # Falls noch nicht geladen
+combined_data <- bind_rows(
+  select(
+    train,
+    `Monate Letzte Spende`,
+    `Anzahl Spenden`,
+    Gesamtvolumen,
+    `Monate Erste Spende`,
+    Dataset,
+    `Spende Maerz 2007`
+  ),
+  select(
+    test,
+    `Monate Letzte Spende`,
+    `Anzahl Spenden`,
+    Gesamtvolumen,
+    `Monate Erste Spende`,
+    Dataset,
+    `Spende Maerz 2007`
+  )
+)
+
+# 4) Mehrere Histogramme erstellen: Monate Letzte Spende, Anzahl Spenden, Gesamtvolumen, Monate Erste Spende
+library(ggplot2)
+p1 <- ggplot(combined_data, aes(x = `Monate Letzte Spende`, fill = Dataset)) +
+  geom_histogram(binwidth = 1, position = "dodge", color = "black") +
+  labs(title = "Monate Letzte Spende", x = "Monate", y = "Frequenz") +
+  scale_fill_manual(values = c("Train" = "blue", "Test" = "green")) +
+  theme_minimal()
+
+p2 <- ggplot(combined_data, aes(x = `Anzahl Spenden`, fill = Dataset)) +
+  geom_histogram(binwidth = 1, position = "dodge", color = "black") +
+  labs(title = "Anzahl Spenden", x = "Anzahl", y = "Frequenz") +
+  scale_fill_manual(values = c("Train" = "blue", "Test" = "green")) +
+  theme_minimal()
+
+p3 <- ggplot(combined_data, aes(x = Gesamtvolumen, fill = Dataset)) +
+  geom_histogram(binwidth = 500, position = "dodge", color = "black") +
+  labs(title = "Gesamtvolumen", x = "Volumen", y = "Frequenz") +
+  scale_fill_manual(values = c("Train" = "blue", "Test" = "green")) +
+  theme_minimal()
+
+p4 <- ggplot(combined_data, aes(x = `Monate Erste Spende`, fill = Dataset)) +
+  geom_histogram(binwidth = 5, position = "dodge", color = "black") +
+  labs(title = "Monate Erste Spende", x = "Monate", y = "Frequenz") +
+  scale_fill_manual(values = c("Train" = "blue", "Test" = "green")) +
+  theme_minimal()
+
+# 5) Balkendiagramm für die Zielvariable (nur Trainingsdaten)
+p5 <- ggplot(train, aes(x = factor(`Spende Maerz 2007`), fill = "Train")) +
+  geom_bar(color = "black") +
+  labs(
+    title = "Klassenverteilung (Spende im März 2007, Trainingsdaten)",
+    x = "Klasse",
+    y = "Frequenz"
+  ) +
+  scale_fill_manual(values = c("Train" = "blue")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# 6) Alle Plots zusammen in einem Grid anzeigen (2 Spalten, 3 Zeilen)
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, p5, ncol = 2)
+
+p
+
+
+
+
+
+# Folie 8/9/12 Zusammenfassung
+##############################################################################
+# DEMO-SKRIPT:
+#  - Erzeugt zuerst einen neuen Prädiktor 'Spendetakt' = AnzahlSpenden / MonateLetzteSpende
+#  - Erstellt links einen Pairs-Plot (Streumatrix) mit Farbgebung nach Zielvariable
+#  - Erstellt rechts eine Korrelationsmatrix mit dem neuen Prädiktor
+#  - Alles OHNE Shiny, in einem einzigen Plot-Fenster nebeneinander
+##############################################################################
+
+# Beispielhafte Daten simulieren (als Platzhalter, bis echte Daten eingelesen sind):
+set.seed(123)
+train_data <- data.frame(
+  MonateLetzteSpende  = sample(1:12, 100, replace = TRUE),
+  AnzahlSpenden       = sample(1:10, 100, replace = TRUE),
+  Gesamtvolumen       = sample(seq(250, 5000, by=50), 100, replace=TRUE),
+  MonateErsteSpende   = sample(12:60, 100, replace = TRUE),
+  SpendeMaerz2007     = sample(c("Ja","Nein"), 100, replace=TRUE)
+)
+
+# ----------------------------------------------------------------------------
+# 1) Neuen Prädiktor "Spendetakt" bilden
+# ----------------------------------------------------------------------------
+train_data$Spendetakt <- train_data$AnzahlSpenden / train_data$MonateLetzteSpende
+
+# ----------------------------------------------------------------------------
+# 2) Gemeinsamer Plot mit 2 Teilgrafiken nebeneinander
+# ----------------------------------------------------------------------------
+par(mfrow = c(1, 2),    # 1 Zeile, 2 Spalten
+    oma  = c(0, 0, 2, 0),
+    mar  = c(4, 4, 4, 1))
+
+# a) Pairs-Plot (linke Seite)
+numeric_vars <- c("MonateLetzteSpende","AnzahlSpenden","Gesamtvolumen","MonateErsteSpende","Spendetakt")
+farben <- ifelse(train_data$SpendeMaerz2007 == "Ja", "green", "red")
+
+pairs(
+  train_data[, numeric_vars],
+  col       = farben,
+  pch       = 16,
+  cex       = 1.2,
+  main      = "Pairs-Plot der Trainingsdaten",
+  font.main = 2,
+  cex.main  = 1.4,
+  cex.labels= 1.2
+)
+
+# b) Korrelation (rechte Seite)
+data_num   <- train_data[sapply(train_data, is.numeric)]
+cor_matrix <- cor(data_num, use="pairwise.complete.obs")
+
+if (!requireNamespace("corrplot", quietly = TRUE)) {
+  install.packages("corrplot")
+}
+library(corrplot)
+
+corrplot(
+  cor_matrix,
+  method      = "color",
+  type        = "upper",
+  tl.col      = "black",
+  tl.srt      = 45,
+  addCoef.col = "black",
+  number.cex  = 0.8,
+  title       = "Korrelationsmatrix (inkl. Spendetakt)",
+  mar         = c(0, 0, 2, 0),
+  cex.main    = 1.4,
+  font.main   = 2
+)
+
+# ----------------------------------------------------------------------------
+# Fertig: Ein Plot mit Pairs-Plot links und Korrelation rechts
+# ----------------------------------------------------------------------------

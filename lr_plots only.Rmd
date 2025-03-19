@@ -25,9 +25,19 @@ library(pROC)
 ## 1.2 CSV-Dateien Anbindung
 Die Trainings- und Testdaten werden aus den entsprechenden CSV-Dateien eingelesen. Anschlie&szlig;end &uuml;berpr&uuml;fen wir stichprobenartig, ob die Daten korrekt geladen wurden.
 ```{r load-data}
+##############################################################################
+# 1) READ THE CSV FILES AND UNIFY COLUMNS
+##############################################################################
+
+# Load needed packages
+library(tidyverse)
+library(dplyr)
+
+# Read your train/test CSVs
 train_data <- read.csv("bloodtrain.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
 test_data  <- read.csv("bloodtest.csv",  header = TRUE, sep = ",", stringsAsFactors = FALSE)
 
+# Rename columns (to have consistent readable names with spaces)
 colnames(train_data) <- c(
   "ID",
   "Monate Letzte Spende",
@@ -37,7 +47,6 @@ colnames(train_data) <- c(
   "Spende Maerz 2007"
 )
 
-# --- A.3) Spaltennamen anpassen (Test) --------------------------------------
 colnames(test_data) <- c(
   "ID",
   "Monate Letzte Spende",
@@ -46,9 +55,41 @@ colnames(test_data) <- c(
   "Monate Erste Spende"
 )
 
-# Erste Zeilen anzeigen
-head(train_data)
-head(test_data)
+# Mark 'Dataset' so we know which rows are Train vs. Test
+train_data$Dataset <- "Train"
+test_data$Dataset  <- "Test"
+
+# If your test data lacks the target column:
+#   test_data$`Spende Maerz 2007` <- NA
+# but for the boxplots, we only need the numeric columns + "Dataset", so it's okay.
+
+##############################################################################
+# 2) COMBINE INTO ONE DATA FRAME (“combined_data”) FOR YOUR BOXPLOTS
+##############################################################################
+# We’ll just keep the columns we want for the 4 boxplots + "Dataset"
+combined_data <- bind_rows(
+  select(
+    train_data,
+    `Monate Letzte Spende`,
+    `Anzahl Spenden`,
+    Gesamtvolumen,
+    `Monate Erste Spende`,
+    Dataset
+  ),
+  select(
+    test_data,
+    `Monate Letzte Spende`,
+    `Anzahl Spenden`,
+    Gesamtvolumen,
+    `Monate Erste Spende`,
+    Dataset
+  )
+)
+
+
+
+
+
 ```
 
 # 2. Datenverständnis
@@ -88,142 +129,886 @@ ggplot(train_data, aes(x = factor(`Spende Maerz 2007`))) +
        # Achsenbeschriftung anstatt 01 bitte "Nein" und "Ja"
        scale_x_discrete(labels = c("Nein", "Ja")),
        y = "Häufigkeit")
+
 ```
 
-## 3.2 Boxplots: Beispiel "Monate seit letzter Spende"
-Hier gehen wir davon aus, dass im Datensatz die Variable `MonateLetzteSpende` (bzw. in Kombination mit `MonateErsteSpende`) vorliegt.  
-Falls gewünscht, kannst Du &uuml;ber diesen Unterschied beispielsweise einen Boxplot f&uuml;r Trainings- und Testdaten erstellen.
-```{r boxplots}
-# Trainingsdaten
-ggplot(train_data, aes(y = `Monate Letzte Spende`)) +
-  geom_boxplot(fill = "steelblue") +
-  labs(title = "Boxplot Monate Letzte Spende - Trainingsdaten",
-       y = "Monate seit letzter Spende")
+## 3.1 Boxplots: Vergleich Train vs. Test
+Vergleiche die Verteilung der numerischen Variablen zwischen Trainings- und Testdaten mithilfe von Boxplots.
 
-# Testdaten
-ggplot(test_data, aes(y = `Monate Letzte Spende`)) +
-  geom_boxplot(fill = "orange") +
-  labs(title = "Boxplot MonateLetzteSpende - Testdaten",
-       y = "Monate seit letzter Spende")
-```
+```{r boxplot-plus-annotation-with-title, echo=TRUE}
+## Folie 4: Boxplot Verleich der Trainings- und Testdaten ----
+##############################################################################
+# 4 Boxplots (oben) + lila Kommentarbox (unten) + Main Title oben
+##############################################################################
 
-## 3.3 Histogramme: Anzahl Spenden
-Histogramme zur Darstellung der Verteilung des Pr&auml;diktors `AnzahlSpenden`.
-```{r histograms}
-ggplot(train_data, aes(x = `Anzahl Spenden`)) +
-  geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
-  labs(title = "Histogramm AnzahlSpenden (Train)",
-       x = "Anzahl Spenden",
-       y = "H&auml;ufigkeit")
+# Wir erstellen ein A4 Querformat für eine Prästenation.
+# Die seite hat den Grunton violett (#7F3FBF)
+# Die Schriften aller Daten sind weiss und auch die Rahmen
 
-ggplot(test_data, aes(x = `Anzahl Spenden`)) +
-  geom_histogram(binwidth = 1, fill = "orange", color = "black") +
-  labs(title = "Histogramm AnzahlSpenden (Test)",
-       x = "Anzahl Spenden",
-       y = "H&auml;ufigkeit")
-```
+# Wir erstellen ein Präsentationsrasater:
 
-## 3.4 Pairs-Plot & Korrelationsmatrix
-Ein Pairs-Plot zeigt die Beziehungen zwischen den numerischen Variablen. Anschlie&szlig;end wird eine Korrelationsmatrix erstellt.
-```{r pairs-corr}
-# Extrahiere numerische Spalten
-num_cols <- train_data %>% select_if(is.numeric)
+# Wir legen 3 Zeilen x 4 Spalten an:
 
-# Pairs-Plot
-pairs(num_cols, main = "Pairs Plot - Trainingsdaten")
+#   Zeile 1: Folienüberschrift: "
+# "Vergleich der Trainings- und Testdaten", Grösse 24 Punkt umrandet weiss 
+# (weisse Schrift, Weisser Rahmen da ja A4 Blatt violett)
+# Zentriert  
 
-# Korrelationsmatrix und corrplot
-cor_mat <- cor(num_cols, use = "complete.obs")
-corrplot(cor_mat, method = "circle", type = "upper", 
-         title = "Korrelation (Trainingsdaten)", tl.cex = 0.8, mar = c(0,0,1,0))
-```
 
-# 4. Feature Engineering
-Erstelle einen neuen Pr&auml;diktor, z.B. die SpendenRate. Hier wird angenommen, dass man die Differenz zwischen `MonateLetzteSpende` und `MonateErsteSpende` berechnet (als Indikator f&uuml;r die Donation-Dauer).  
-Falls der Unterschied 0 ergeben sollte, ist ein entsprechender Schutz einzubauen.
-```{r feature-engineering, message=FALSE, warning=FALSE}
-# 1) Libraries laden (nur wenn noch nicht oben geschehen)
-library(tidyverse)
-library(ggplot2)
+#   Zeile 2: Boxplot (4 kombinierte einzelplots)
+# die wir erstellen wollen. Der Die überschriften "Wert" und "Datensatz" weglassen
+# Subplots 1,2,3,4 (jeweils 1 Boxplot)
+# Jeweils links und rechts der Seite 15 Zeichen platz lassen (Flächte bleibt violett)  
 
-# 2) Einlesen und direkt umbenennen, damit keine Leerzeichen in den Spaltennamen vorkommen:
-train_data <- read.csv("bloodtrain.csv", 
-                       header = TRUE, 
-                       sep = ",", 
-                       stringsAsFactors = FALSE)
+#   Zeile 3:lila Kasten mit Erkenntnissen und Schlussfolgerungen
+# Text: "Erkenntnisse" in weiss, 1.4 fach, fett, links oben
+#Subplot 5,5,5,5 (ein großer lila Kasten)
 
-colnames(train_data) <- c(
-  "ID",
-  "MonateLetzteSpende",
-  "AnzahlSpenden",
-  "Gesamtvolumen",
-  "MonateErsteSpende",
-  "SpendeMaerz2007"
+
+
+##############################################################################
+# KOMPLETTES BEISPIEL
+# - 3 Zeilen × 4 Spalten Layout
+# - Zeile 1: Titel (Panel 1,1,1,1)
+# - Zeile 2: 4 Boxplots (Panels 2,3,4,5)
+# - Zeile 3: Lila Kommentarbox (Panel 6,6,6,6)
+#
+# Wichtig: wir rufen layout() NUR EINMAL, und zeichen alle Boxplots
+# in der Reihenfolge, die layout(...) vorgibt. 
+##############################################################################
+
+# Falls Du ein "reines" A4 Querformat willst, rufe z.B.:
+# pdf("boxplot_annot_a4quer.pdf", width=11.69, height=8.27)
+# # ... Code ...
+# dev.off()
+
+########################################
+# 1) Layout definieren (3×4)
+########################################
+layout(
+  matrix(c(
+    1,1,1,1,   # Panel 1 => Titel über 4 Spalten
+    2,3,4,5,   # Panels 2..5 => 4 Boxplots
+    6,6,6,6    # Panel 6 => Kommentarbox unten über 4 Spalten
+  ), nrow=3, byrow=TRUE),
+  #heights = c(1.0, 3.5, 1.3)  # Erste Zeile: 1.0 Einheiten, zweite: 3.5, dritte: 1.3
+  heights = c(1.0, 3.5, 2.5)  # Erste Zeile: 1.0 Einheiten, zweite: 3.5, dritte: 1.3
 )
 
-# 3) Neuer Datensatz mit Feature Engineering
-train_data_clean <- train_data %>%
-  mutate(
-    # Berechnung: Dauer seit erster Spende MINUS Dauer seit letzter Spende
-    MonateSeither = MonateErsteSpende - MonateLetzteSpende,
-    # Nur wenn MonateSeither > 0, wird SpendenRate berechnet, sonst NA
-    SpendenRate   = ifelse(MonateSeither > 0,
-                           AnzahlSpenden / MonateSeither,
-                           NA_real_)
-  )
+########################################
+# 2) GLOBALE Farb/Schrift-Einstellungen
+########################################
+par(
+  bg       = "black",   # Hintergrund des A4 Blattes
+  fg       = "blue",        # Farbe der Rahmen um die Plots
+  col.axis = "white",
+  col.lab  = "white",
+  col.main = "white"
+)
 
-# 4) Schneller Blick ins Ergebnis
-summary(train_data_clean$MonateSeither)
-summary(train_data_clean$SpendenRate)
+########################################
+# Panel 1 => Titel
+########################################
+par(mar=c(2, # Hier wird der rand
+          2, #   
+          2,
+          2
+)) # kein Rand
+plot.new()
+usr <- par("usr")
+# Rechteck in violett (evtl. überflüssig, da bg=violett):
+rect(usr[1], usr[3], usr[2], usr[4], col="#7F3FBF", border=NA)
 
-# 5) Plot: Histogramm des neuen Prädiktors "SpendenRate"
-ggplot(train_data_clean, aes(x = SpendenRate)) +
-  geom_histogram(binwidth = 0.1, fill = "darkgreen", color = "black") +
+# Großer weißer Text zentriert
+title_str <- "Vergleich der Trainings- und Testdaten"
+text(
+  x=0.5, y=0.5,
+  labels=title_str,
+  col="white",
+  cex=5,        # Schrifthöhe
+  font=2,         # fett
+  adj=c(0.5,0.5)  # zentriert
+)
+
+########################################
+# Panels 2..5 => 4 Boxplots
+########################################
+
+
+
+# Panel 2 (Boxplot 1)
+par(mar=c(3,3,2,1))
+boxplot(
+  `Monate Letzte Spende` ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Monate Letzte Spende",
+  xlab   = "",
+  ylab   = ""
+)
+
+# Panel 3 (Boxplot 2)
+par(mar=c(3,3,2,1))
+boxplot(
+  `Anzahl Spenden` ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Anzahl Spenden",
+  xlab   = "",
+  ylab   = ""
+)
+
+# Panel 4 (Boxplot 3)
+par(mar=c(3,3,2,1))
+boxplot(
+  Gesamtvolumen ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Gesamtvolumen",
+  xlab   = "",
+  ylab   = ""
+)
+
+# Panel 5 (Boxplot 4)
+par(mar=c(3,3,2,1))
+boxplot(
+  `Monate Erste Spende` ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Monate Erste Spende",
+  xlab   = "",
+  ylab   = ""
+)
+
+###########################################################
+# Panel 6 => Kommentarbox unten
+###########################################################
+par(mar = c(2, 2, 2, 2))
+plot.new()
+usr <- par("usr")
+
+# Rotes Rechteck als Hintergrund:
+rect(
+  xleft   = usr[1],
+  ybottom = usr[3],
+  xright  = usr[2],
+  ytop    = usr[4],
+  col     = "red",
+  border  = NA
+)
+
+# Weißer Text: "Erkenntnisse"
+text(
+  x     = 0.02, 
+  y     = 0.80,
+  labels= "Erkenntnisse",
+  col   = "white", 
+  cex   = 2.4, 
+  font  = 2, 
+  adj   = c(0, 0.5)
+)
+
+text(
+  x     = 0.02, 
+  y     = 0.55,
+  labels= paste(
+    " • Verteilungen der Variablen sind nicht unterschiedlich für Trainings- und Testdaten\n",
+    "• Kerben der Boxen überlappen\n",
+    "• Variabilität ist im Testdatensatz teilweise z. B. bei \"Anzahl Spenden\" höher."
+  ),
+  col   = "white", 
+  cex   = 1.8, 
+  adj   = c(0, 0.5)
+)
+
+# Weißer Text: "Schlussfolgerung"
+text(
+  x     = 0.02, 
+  y     = 0.15,
+  labels= "Schlussfolgerung\n",
+  col   = "white", 
+  cex   = 2.4, 
+  font  = 2, 
+  adj   = c(0, 0.5)
+)
+
+text(
+  x     = 0.02, 
+  y     = 0.05,
+  labels= paste(
+    "Man kann annehmen, dass Test- und Trainingsdaten Stichproben aus derselben Population sind.\n",
+    ""
+  ),
+  col   = "white", 
+  cex   = 1.8,
+  adj   = c(0, 0.5)
+)
+
+```
+
+
+## 3.2 Histogramme: Anzahl Spenden
+Histogramme zur Darstellung der Verteilung des Pr&auml;diktors `AnzahlSpenden`.
+```{r histograms}
+# Folie 5: Histogramme der Zielvariable ----
+
+
+## R-Skript: "Folie": Vergleich der Verteilungen (Train vs. Test)
+##            + Ein großer Titel oben (violette Leiste)
+##            + 4 Histogramme nebeneinander
+##            + Balkendiagramm (Klassenverteilung) unten links
+##            + Kommentarkasten unten rechts
+
+
+## 1) BENÖTIGTE PAKETE ----
+# install.packages(c("tidyverse","ggplot2","dplyr","gridExtra"))
+library(tidyverse)
+library(gridExtra)  # für grid.arrange, tableGrob etc.
+library(grid)       # für grid.rect, grid.text
+
+
+## 3) EINZELNE PLOTS DEFINIEREN ----
+## 3.1) Histogramm 1: Monate Letzte Spende
+p1 <- ggplot(combined_data, aes(x=`Monate Letzte Spende`, fill=Dataset)) +
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Monate Letzte Spende", x="Monate", y="Frequenz") +
+  theme_minimal()
+
+## 3.2) Histogramm 2: Anzahl Spenden
+p2 <- ggplot(combined_data, aes(x=`Anzahl Spenden`, fill=Dataset)) +
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Anzahl Spenden", x="Anzahl", y="Frequenz") +
+  theme_minimal()
+
+## 3.3) Histogramm 3: Gesamtvolumen
+p3 <- ggplot(combined_data, aes(x=Gesamtvolumen, fill=Dataset)) +
+  geom_histogram(binwidth=500, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Gesamtvolumen", x="Volumen", y="Frequenz") +
+  theme_minimal()
+
+## 3.4) Histogramm 4: Monate Erste Spende
+p4 <- ggplot(combined_data, aes(x=`Monate Erste Spende`, fill=Dataset)) +
+  geom_histogram(binwidth=5, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Monate Erste Spende", x="Monate", y="Frequenz") +
+  theme_minimal()
+
+## 3.5) Balkendiagramm der Zielvariable (Train)
+p5 <- ggplot(train_data, aes(x=factor(`Spende Maerz 2007`), fill="Train")) +
+  geom_bar(color="black") +
+  scale_fill_manual(values=c("Train"="blue")) +
+  scale_x_discrete(labels=c("0"="nein","1"="ja")) +
   labs(
-    title = "Histogramm neuer Prädiktor: SpendenRate",
-    x = "SpendenRate",
-    y = "Häufigkeit"
-  )
+    title="Klassenverteilung (Spende im März 2007, Trainingsdaten)",
+    x="Klasse", y="Anzahl"
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
+
+## 4) "TITEL"-GROB ERSTELLEN ----
+
+
+title_grob <- textGrob(
+  "Vergleich Verteilungen Trainings- und Testdaten",
+  gp = gpar(fontsize=32, col="grey", fontface="bold")  # große weiße Schrift
+)
+
+title_bg <- rectGrob(
+  gp=gpar(fill="#7F3FBF", col=NA)  # violette Rechteckfläche
+)
+
+# Wir kombinieren das Rechteck + Titeltext mit "grobTree"
+title_panel <- grobTree(title_bg, 
+                        textGrob("",
+                                 x=unit(0,"npc"), y=unit(0,"npc")), 
+                        title_grob)
+
+
+## 5) "KOMMENTAR"-GROB ERSTELLEN (Erkenntnisse-Box) ----
+
+
+comment_bg <- rectGrob(
+  gp=gpar(fill=rgb(1,1,1,0.15), col="black")                                    # Rahmenfarbe Box
+  # z.B. halb-durchsichtiges Weiß oder so; anpassbar
+)
+
+comment_text <- textGrob(
+  "Erkenntnisse\n
+• Monate Letzte Spende: Verteilungen weitgehend ähnlich \n
+• Anzahl Spenden: Im Testdatensatz weniger hohe Spenderzahlen\n
+• Gesamtvolumen: tendenziell kleinere Werte im Test\n
+• Monate Erste Spende: Testdatensatz <-> potenziell andere Spenderhistorie
+\n
+Schlussfolgerung\n
+- Möglicherweise leichte Stichprobendifferenz \n
+- Modell sollte train/test-Shift abfedern können
+",
+  x=0.02, y=0.98, just=c("left","top"),
+  gp=gpar(col="black", fontsize=14, fontface="plain")                           # Schriftfarbe Box
+)
+
+comment_panel <- grobTree(comment_bg, comment_text)
+
+
+## 6) DIE "FERTIGE FOLIE" MIT grid.arrange ----
+
+
+# Wir bauen 3 Zeilen:
+# Zeile A: Großer Titel
+# Zeile B: 4 Plots nebeneinander
+# Zeile C: Links Balkendiagramm p5, rechts der Kommentar
+
+###############################################################################
+## KAPITEL 1: PAKETE & SETUP
+###############################################################################
+
+library(tidyverse)
+library(gridExtra)  # für grid.arrange
+library(grid)       # für rectGrob, textGrob etc.
+
+# Wir gehen davon aus, dass du train_data und test_data eingelesen hast
+# und combined_data (train+test) verfügbar ist.
+
+###############################################################################
+## KAPITEL 2: HISTOGRAMME DEFINIEREN
+##    - p1: Mit Y-Achsenbeschriftung "Frequenz" und Legende (links)
+##    - p2, p3, p4: Ohne Y-Achsenbeschriftung und ohne Legende
+###############################################################################
+
+# p1: Histogramm "Monate Letzte Spende"
+#    - Rot = Test, Blau = Train
+#    - Legende links (legend.position="left")
+#    - y="Frequenz"
+p1 <- ggplot(combined_data, aes(x=`Monate Letzte Spende`, fill=Dataset)) +
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Monate Letzte Spende",
+    x="Monate",
+    y="Frequenz"
+  ) +
+  theme_minimal() +
+  theme(legend.position="left")
+
+# p2: Histogramm "Anzahl Spenden"
+#    - KEINE Legende, KEINE Y-Achsenbeschriftung
+p2 <- ggplot(combined_data, aes(x=`Anzahl Spenden`, fill=Dataset)) +
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Anzahl Spenden",
+    x="Anzahl",
+    y=NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
+# p3: Histogramm "Gesamtvolumen"
+#    - KEINE Legende, KEINE Y-Achsenbeschriftung
+p3 <- ggplot(combined_data, aes(x=Gesamtvolumen, fill=Dataset)) +
+  geom_histogram(binwidth=500, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Gesamtvolumen",
+    x="Volumen",
+    y=NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
+# p4: Histogramm "Monate Erste Spende"
+#    - KEINE Legende, KEINE Y-Achsenbeschriftung
+p4 <- ggplot(combined_data, aes(x=`Monate Erste Spende`, fill=Dataset)) +
+  geom_histogram(binwidth=5, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Monate Erste Spende",
+    x="Monate",
+    y=NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
+###############################################################################
+## KAPITEL 3: BALKENDIAGRAMM p5 (unten links)
+###############################################################################
+
+# p5: Balkendiagramm für "Spende Maerz 2007" im Trainingsdatensatz
+#    - Nur blau (Train)
+#    - Keine Legende
+p5 <- ggplot(train_data, aes(x=factor(`Spende Maerz 2007`), fill="Train")) +
+  geom_bar(color="black") +
+  scale_fill_manual(values=c("Train"="blue")) +
+  scale_x_discrete(labels=c("0"="nein","1"="ja")) +
+  labs(
+    title="Klassenverteilung (Spende im März 2007, Trainingsdaten)",
+    x="Klasse",
+    y="Anzahl"
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
+###############################################################################
+## KAPITEL 4: KOMMENTARBOX RECHTS (Erkenntnisse und Schlussfolgerung)
+###############################################################################
+
+# "comment_bg": halb-transparentes weißes Rechteck
+comment_bg <- rectGrob(
+  gp=gpar(fill=rgb(1,1,1,0.15), col="white")
+)
+
+# "comment_text": grüner Text mit Bullet-Points
+comment_text <- textGrob(
+  "Erkenntnisse\n• Monate Letzte Spende: Verteilungen weitgehend ähnlich\n• Anzahl Spenden: Im Testdatensatz weniger hohe Spenderzahlen\n• Gesamtvolumen: tendenziell kleinere Werte im Test\n• Monate Erste Spende: evtl. andere Historie\n\nSchlussfolgerung\n- Möglicherweise leichte Stichprobendifferenz\n- Modell sollte train/test-Shift abfedern können",
+  x=0.02, y=0.98, just=c("left","top"),
+  gp=gpar(col="black", fontsize=14)
+)
+
+comment_panel <- grobTree(comment_bg, comment_text)
+
+###############################################################################
+## KAPITEL 5: TITEL-PANEL OBEN
+###############################################################################
+
+title_grob <- textGrob(
+  "Vergleich Verteilungen Trainings- und Testdaten",
+  gp = gpar(fontsize=32, col="white", fontface="bold")
+)
+title_bg   <- rectGrob(gp=gpar(fill="#7F3FBF", col=NA))
+title_panel <- grobTree(title_bg, title_grob)
+
+###############################################################################
+## KAPITEL 6: ZUSAMMENSETZEN DES GESAMT-PLOTS MIT grid.arrange
+###############################################################################
+
+grid.arrange(
+  # Reihenfolge der Panels:
+  #  1) = title_panel
+  #  2) = p1 (mit Legende & y=Frequenz)
+  #  3) = p2
+  #  4) = p3
+  #  5) = p4
+  #  6) = p5 (Balkendiagramm)
+  #  7) = comment_panel (Box)
+  
+  title_panel,
+  p1,
+  p2,
+  p3,
+  p4,
+  p5,
+  comment_panel,
+  
+  # Layout: 3 Zeilen, 4 Spalten
+  layout_matrix = rbind(
+    c(1,1,1,1),   # Zeile 1 => Titel
+    c(2,3,4,5),   # Zeile 2 => 4 Histogramme
+    c(6,6,7,7)    # Zeile 3 => p5 links, Kommentar rechts
+  ),
+  nrow=3,
+  heights=c(0.8, 3, 1.5)
+)
+
+
+
+
+
+
 
 
 
 ```
 
-# 5. Modell & Auswertung (Plotausgabe)
-Zum Abschluss wird ein einfaches logistisches Regressionsmodell gebaut und dessen Ergebnisse visualisiert.
+## 3.3 Pairs-Plot & Korrelationsmatrix
+Ein Pairs-Plot zeigt die Beziehungen zwischen den numerischen Variablen. Anschlie&szlig;end wird eine Korrelationsmatrix erstellt.
+```{r pairs-corr, echo=TRUE, fig.height=7, fig.width=12}
+##############################################################################
+# 3.3) PAIRS-PLOT & KORRELATIONSMATRIX (MIT ABSTÄNDEN IN DEN SPALTENNAMEN)
+# ----------------------------------------------------------------------------
+# Ziel:
+#   - Genau wie in den vorigen Plots wollen wir weiterhin Leerzeichen in den 
+#     Spaltennamen (z.B. "Monate Letzte Spende", "Anzahl Spenden").
+#   - Wir bilden "Spendetakt" = (Anzahl Spenden) / (Monate Letzte Spende).
+#   - Division durch 0 vermeiden => Zeilen, wo "Monate Letzte Spende" == 0, => NA.
+#   - Danach: Pairs-Plot (links) & Korrelationsmatrix (rechts) in einem gemeinsamen Layout.
+##############################################################################
+
+# 1) Datensatz neu einlesen
+#    Wir gehen davon aus, dass 'bloodtrain.csv' die folgenden Spalten hat:
+#      "ID", 
+#      "Monate Letzte Spende", 
+#      "Anzahl Spenden", 
+#      "Gesamtvolumen", 
+#      "Monate Erste Spende",
+#      "Spende Maerz 2007"
+train_data <- read.csv("bloodtrain.csv", stringsAsFactors = FALSE)
+
+# Zur Sicherheit: Gleiche Namensgebung wie in den vorherigen Plots
+colnames(train_data) <- c(
+  "ID",
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende",
+  "Spende Maerz 2007"
+)
+
+# 2) 0 -> NA in "Monate Letzte Spende"
+#    Prüfen, ob es überhaupt Werte == 0 gibt. Nur dann ersetzen wir.
+has_zero <- any(train_data$`Monate Letzte Spende` == 0, na.rm = TRUE)
+if (has_zero) {
+  train_data$`Monate Letzte Spende`[train_data$`Monate Letzte Spende` == 0] <- NA
+}
+
+# 3) Neuer Prädiktor "Spendetakt" = (Anzahl Spenden) / (Monate Letzte Spende)
+train_data$Spendetakt <- train_data$`Anzahl Spenden` / train_data$`Monate Letzte Spende`
+
+# 4) 2-spaltiges Grafiklayout
+par(
+  mfrow = c(1, 2),
+  oma   = c(0, 0, 2, 0),
+  mar   = c(4, 4, 4, 1)
+)
+
+# 5) LINKS: Pairs-Plot
+#    Wir wählen die Spalten, alle haben Leerzeichen wie in den früheren Abschnitten:
+numeric_vars <- c(
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende",
+  "Spendetakt"
+)
+
+# Farbgebung nach "Spende Maerz 2007": Wir interpretieren 1 => grün, 0 => rot.
+point_colors <- ifelse(train_data$`Spende Maerz 2007` == 1, "green", "red")
+
+pairs(
+  train_data[, numeric_vars],
+  col       = point_colors,
+  pch       = 16,       # geschlossene Kreise
+  cex       = 1.2,      # Punktgröße
+  font.main = 2,        # Fettschrift für den Titel
+  font.lab  = 2,
+  main      = "Pairs-Plot der Trainingsdaten",
+  cex.main  = 1.4,
+  cex.labels= 1.2
+)
+
+# 6) RECHTS: Korrelationsmatrix (inkl. Spendetakt)
+library(corrplot)  # Falls nicht installiert: install.packages("corrplot")
+
+# Zuerst nur numerische Spalten filtern
+num_data <- train_data[sapply(train_data, is.numeric)]
+
+# Falls "ID" numerisch und unnötig, entfernen wir sie
+if ("ID" %in% names(num_data)) {
+  num_data <- num_data[, !names(num_data) %in% "ID"]
+}
+
+# Korrelation (pairwise.complete.obs => Zeilen mit NA in mind. einer Variable ignorieren)
+cor_matrix <- cor(num_data, use = "pairwise.complete.obs")
+
+# Plot der Korrelationsmatrix
+corrplot(
+  cor_matrix,
+  method      = "color",   # Farbkacheln
+  type        = "upper",   # Nur obere Hälfte
+  tl.col      = "black",
+  tl.srt      = 45,
+  addCoef.col = "black",   # Zahlen in Schwarz
+  number.cex  = 0.8,
+  title       = "Korrelationsmatrix (mit Spendetakt)",
+  mar         = c(0, 0, 2, 0),
+  cex.main    = 1.4,
+  font.main   = 2
+)
+
+# FERTIG: Links Pairs-Plot (mit Leerzeichen in Spaltennamen), 
+#         rechts Korrelationsmatrix. 
+
+
+```
+
+
 
 ## 5.1 Logistisches Regressionsmodell
 Wir passen ein Modell an, dass u.a. `AnzahlSpenden`, `MonateLetzteSpende` und den neuen Pr&auml;diktor `SpendenRate` verwendet.  
 (Dabei muss die Zielvariable 0/1-codiert sein.)
-```{r model}
-# Konvertiere Zielvariable in numerisch (bzw. Faktor), falls erforderlich
-train_data_clean$SpendeMaerz2007 <- as.factor(train_data_clean$SpendeMaerz2007)
+```{r model, echo=TRUE}
 
-glm_model <- glm(SpendeMaerz2007 ~ AnzahlSpenden + MonateLetzteSpende + SpendenRate,
-                 data = train_data_clean,
-                 family = binomial)
+##############################################################################
+# 5.1) LOGISTISCHES REGRESSIONSMODELL
+# ----------------------------------------------------------------------------
+# Wir bauen ein Modell, das u.a. die Spalten
+#   "Anzahl Spenden",
+#   "Monate Letzte Spende",
+#   "Monate Erste Spende"
+# sowie den neuen Prädiktor "Spenden Rate" verwendet.
+# 
+# Zielvariable: "Spende Maerz 2007" (0/1-codiert)
+#  - Wenn 0 => "Nein", 1 => "Ja"
+# 
+# ACHTUNG:
+#   - Die Spaltennamen haben LEERZEICHEN wie "Monate Letzte Spende".
+#     Daher verwenden wir Backticks `...`.
+#   - 0-Werte in "Monate Letzte Spende" => NA, damit Division nicht crasht.
+##############################################################################
 
+# 1) Falls train_data noch nicht existiert, CSV einlesen und 
+#    mit LEERZEICHEN in den Spaltennamen benennen:
+if (!exists("train_data")) {
+  train_data <- read.csv("bloodtrain.csv", header = TRUE, stringsAsFactors = FALSE)
+  colnames(train_data) <- c(
+    "ID",
+    "Monate Letzte Spende",
+    "Anzahl Spenden",
+    "Gesamtvolumen",
+    "Monate Erste Spende",
+    "Spende Maerz 2007"
+  )
+}
+
+# 2) 0 -> NA in "Monate Letzte Spende" (falls 0-Werte vorhanden)
+if (any(train_data$`Monate Letzte Spende` == 0, na.rm = TRUE)) {
+  train_data$`Monate Letzte Spende`[train_data$`Monate Letzte Spende` == 0] <- NA
+}
+
+# 3) Falls "Spenden Rate" noch nicht existiert, erzeugen wir sie:
+#    Spenden Rate = (Anzahl Spenden) / (Monate Letzte Spende)
+if (!"Spenden Rate" %in% colnames(train_data)) {
+  train_data$`Spenden Rate` <- with(train_data, 
+    ifelse(is.na(`Monate Letzte Spende`), NA, `Anzahl Spenden` / `Monate Letzte Spende`)
+  )
+}
+
+# 4) Zielvariable in Factor umwandeln (0/1)
+train_data$`Spende Maerz 2007` <- as.factor(train_data$`Spende Maerz 2007`)
+
+# 5) NA-Zeilen entfernen => wir behalten nur vollständige Datensätze
+train_data_clean <- subset(
+  train_data,
+  !is.na(`Spende Maerz 2007`) & !is.na(`Spenden Rate`)
+)
+
+# 6) Einfaches logistisches Modell
+glm_model <- glm(
+  `Spende Maerz 2007` ~ `Anzahl Spenden` + `Monate Letzte Spende` + `Spenden Rate` + `Monate Erste Spende`,
+  data   = train_data_clean,
+  family = binomial(link = "logit")
+)
+
+# 7) Modell-Zusammenfassung
 summary(glm_model)
+
+
+# Summary Model als Plot
+plot(glm_model)
+
+
+
 ```
 
-## 5.2 Konfusionsmatrix und ROC-Plot
-Erstelle Vorhersagen f&uuml;r den Trainingsdatensatz, generiere eine Konfusionsmatrix und plotte die ROC-Kurve.
-```{r model-evaluation}
-# Vorhersagewahrscheinlichkeit
-pred_train <- predict(glm_model, train_data_clean, type = "response")
-# Klassifikation mit 0.5-Schwelle
-pred_class <- ifelse(pred_train > 0.5, 1, 0)
 
-# Konfusionsmatrix
-conf_matrix <- confusionMatrix(factor(pred_class), factor(train_data_clean$SpendeMaerz2007))
+## 5.2 Variable Importance Plot
+Wir erstellen ein Balkendiagramm "Variable Importance"
+
+```{r variable-importance-plot, echo=TRUE, fig.height=5, fig.width=7}
+##############################################################################
+# Einfache Folie: Variable Importance Plot (ähnlich dem Screenshot)
+# ----------------------------------------------------------------
+# ANNAHME: Wir haben bereits ein trainiertes Modell "glm_model"
+#          (z.B. via glm(..., family=binomial)) 
+#          und das Package 'caret' ist geladen.
+##############################################################################
+
+# 1) Variable Importance mit caret::varImp
+var_imp <- caret::varImp(glm_model, scale = FALSE)
+
+# 2) Umwandeln in Dataframe für ggplot
+var_imp_df <- data.frame(
+  Variable   = rownames(var_imp),
+  Importance = var_imp$Overall
+)
+
+# 3) Balkendiagramm mit ggplot2
+library(ggplot2)
+ggplot(var_imp_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +  # Nach links/rechts kippen
+  labs(
+    title = "Variable Importance (Logistisches Modell)",
+    x     = "Prädiktor",
+    y     = "Wichtigkeit"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title   = element_text(face = "bold", size = 36),
+    axis.title.x = element_text(size = 32),
+    axis.title.y = element_text(size = 32),
+    axis.text    = element_text(size = 24)
+  ) 
+
+```
+
+## 5.3 Konfusionsmatrix
+Wir erstellen eine Konfusionsmatrix und berechnen die Genauigkeit, Sensitivität und Spezifität des Modells.
+```{r confusion-matrix}
+##############################################################################
+# 5.3) KONFUSIONSMATRIX & METRIKEN
+# ----------------------------------------------------------------------------
+# Wir erstellen eine Konfusionsmatrix und berechnen Genauigkeit, Sensitivität
+# und Spezifität des Modells.
+##############################################################################
+
+# 1) Falls train_data_clean noch nicht existiert, laden wir die Daten
+if (!exists("train_data_clean")) {
+  train_data_clean <- read.csv("bloodtrain.csv", header = TRUE, stringsAsFactors = FALSE)
+  colnames(train_data_clean) <- c(
+    "ID",
+    "Monate Letzte Spende",
+    "Anzahl Spenden",
+    "Gesamtvolumen",
+    "Monate Erste Spende",
+    "Spende Maerz 2007"
+  )
+}
+
+# 2) 0 -> NA in "Monate Letzte Spende" (falls 0-Werte vorhanden)
+if (any(train_data_clean$`Monate Letzte Spende` == 0, na.rm = TRUE)) {
+  train_data_clean$`Monate Letzte Spende`[train_data_clean$`Monate Letzte Spende` == 0] <- NA
+}
+
+# 3) Falls "Spenden Rate" noch nicht existiert, erzeugen wir sie:
+#    Spenden Rate = (Anzahl Spenden) / (Monate Letzte Spende)
+if (!"Spenden Rate" %in% colnames(train_data_clean)) {
+  train_data_clean$`Spenden Rate` <- with(train_data_clean, 
+    ifelse(is.na(`Monate Letzte Spende`), NA, `Anzahl Spenden` / `Monate Letzte Spende`)
+  )
+}
+
+# 4) Zielvariable in Factor umwandeln (0/1)
+train_data_clean$`Spende Maerz 2007` <- as.factor(train_data_clean$`Spende Maerz 2007`)
+train_data_clean$`Spende Maerz 2007` <- factor(train_data_clean$`Spende Maerz 2007`, levels = c("0", "1"))
+
+# 5) Vorhersagen des Modells
+train_data_clean$Predictions <- predict(glm_model, newdata = train_data_clean, type = "response")
+train_data_clean$Predictions <- as.factor(ifelse(train_data_clean$Predictions >= 0.5, "1", "0"))
+
+# 6) Konfusionsmatrix
+conf_matrix <- confusionMatrix(
+  train_data_clean$Predictions,
+  train_data_clean$`Spende Maerz 2007`
+)
+
+# 7) Metriken (Recall = Sensitivity)
+accuracy    <- conf_matrix$overall["Accuracy"]
+sensitivity <- conf_matrix$byClass["Sensitivity"]
+precision   <- conf_matrix$byClass["Pos Pred Value"]  # "Precision" im caret-Output
+recall      <- conf_matrix$byClass["Sensitivity"]     # "Recall" als "Sensitivity"
+
 print(conf_matrix)
 
-# ROC-Plot
-roc_obj <- roc(as.numeric(train_data_clean$SpendeMaerz2007), pred_train)
-plot(roc_obj, col = "blue", main = "ROC-Kurve - Logistische Regression (Train)")
-auc_value <- auc(roc_obj)
-cat("AUC: ", auc_value)
+
+
 ```
 
-# 6. Fazit
-Dies ist ein grober &Uuml;berblick &uuml;ber die Daten, das Feature Engineering und den Modellierungsprozess. Auf Basis der Plots k&ouml;nnen Hinweise zur Optimierung des Modells gewonnen werden.
+
+
+
+
+
+
+
+
+```{r metrics-and-roc, echo=TRUE, fig.height=5, fig.width=10}
+metrics_df <- data.frame(
+  Metric = c("Genauigkeit", "Sensitivität (Recall)", "Präzision", "Recall"),
+  Wert   = c(accuracy, sensitivity, precision, recall)
+)
+##############################################################################
+# 5.3 + 5.4) Metriken-Plot (links) & ROC-Kurve (rechts)
+# ----------------------------------------------------------------------------
+# Wir zeigen "Übersicht der Metriken" (Barplot) auf der linken Seite,
+# und direkt daneben die ROC-Kurve inklusive AUC auf der rechten Seite.
+#
+# Voraussetzung:
+#   - Wir haben bereits `train_data_clean` (mit Spalte 'Prob' als Wahrscheinlichkeiten)
+#     und ein trainiertes Modell 'glm_model'.
+#   - "Spende Maerz 2007" = Faktor mit Levels c("0","1").
+##############################################################################
+# 1) Falls train_data_clean bzw. glm_model nicht existieren, laden/anlegen:
+if (!exists("train_data_clean") || !exists("glm_model")) {
+  stop("Bitte stellen Sie sicher, dass 'train_data_clean' & 'glm_model' vorhanden sind!")
+}
+
+# 2) Numerische Wahrscheinlichkeiten berechnen (predict(..., type='response'))
+#    => "Prob" = Schätzwerte aus dem Modell
+train_data_clean$Prob <- predict(glm_model, newdata = train_data_clean, type = "response")
+
+# 3) ROC-Kurve berechnen
+#    - 'response' = Zielvariable, am besten Faktor mit Levels c("0","1")
+#    - 'predictor' = numeric, hier unser 'Prob'
+#    - levels=c("0","1") => 0 als negatives, 1 als positives Klasse
+roc_curve <- pROC::roc(
+  response  = train_data_clean$`Spende Maerz 2007`, 
+  predictor = train_data_clean$Prob,
+  levels    = c("0","1")
+)
+
+
+# 1) Prüfen, ob wir train_data_clean und glm_model haben
+if (!exists("train_data_clean") || !"Prob" %in% colnames(train_data_clean) || !exists("glm_model")) {
+  stop("Bitte stellen Sie sicher, dass 'train_data_clean$Prob' und 'glm_model' existieren!")
+}
+
+# 2) PAR-Layout: 1 Zeile, 2 Spalten
+par(mfrow = c(1, 2),      # links: Barplot, rechts: ROC
+    oma  = c(0, 0, 2, 0), # äußerer Rand
+    mar  = c(4, 4, 4, 1)) # innerer Rand pro Plot
+
+# 3) LINKS: Barplot der Metriken
+bar_x <- seq_along(metrics_df$Metric)
+bar_heights <- metrics_df$Wert
+bar_names <- metrics_df$Metric
+
+barplot(
+  height     = bar_heights,
+  names.arg  = bar_names,
+  col        = "steelblue",
+  ylim       = c(0, 1),
+  main       = "Übersicht der Metriken",
+  xlab       = "Kennzahl",
+  ylab       = "Wert"
+)
+
+# Werte draufschreiben
+text(
+  x      = bar_x,
+  y      = bar_heights,
+  labels = round(bar_heights, 2),
+  pos    = 3,     # oberhalb
+  cex    = 1.2
+)
+
+# 4) RECHTS: ROC-Kurve
+plot(
+  roc_curve,
+  col  = "blue",
+  main = paste("ROC-Kurve - AUC:", round(auc_value, 3))
+)
+
+```
+

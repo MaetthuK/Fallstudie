@@ -1,143 +1,136 @@
-## 4) GROB FÜR TITEL
-title_grob <- textGrob(
-"Vergleich Verteilungen Trainings- und Testdaten",
-gp = gpar(fontsize=32, col="grey", fontface="bold")  # z.B. grau
-)
-title_bg <- rectGrob(gp=gpar(fill="#7F3FBF", col=NA))  # violetter Balken
-title_panel <- grobTree(title_bg, title_grob)
-## 5) KOMMENTAR-BOX (Erkenntnisse)
-comment_bg <- rectGrob(
-gp=gpar(fill=rgb(1,1,1,0.15), col="black")
-)
-comment_text <- textGrob(
-"Erkenntnisse\n
-• Monate Letzte Spende: Verteilungen weitgehend ähnlich \n
-• Anzahl Spenden: Im Testdatensatz weniger hohe Spenderzahlen\n
-• Gesamtvolumen: tendenziell kleinere Werte im Test\n
-• Monate Erste Spende: Testdatensatz <-> potenziell andere Spenderhistorie
-\n
-Schlussfolgerung\n
-- Möglicherweise leichte Stichprobendifferenz \n
-- Modell sollte train/test-Shift abfedern können
-",
-x=0.02, y=0.98, just=c("left","top"),
-gp=gpar(col="black", fontsize=14)
-)
-comment_panel <- grobTree(comment_bg, comment_text)
-## 6) ZUSAMMENSETZEN MIT grid.arrange ---
-grid.arrange(
-# 7 "Elemente" in passender Reihenfolge:
-title_panel,   # 1
-p1, p2, p3, p4,# 2..5
-p5, comment_panel,  # 6..7
-# Layout: 3 Zeilen, 4 Spalten
-layout_matrix = rbind(
-c(1,1,1,1),   # Zeile 1 => Titel
-c(2,3,4,5),   # Zeile 2 => 4 Histogramme
-c(6,6,7,7)    # Zeile 3 => p5 links, Kommentar rechts
-),
-# Hiermit stellst Du sicher, dass die 4 Spalten
-# jeweils gleich breit sind und so jeder Plot
-# dieselbe Plotbreite bekommt:
-widths  = c(1,1,1,1),
-# Höhenverhältnis der 3 Zeilen:
-heights = c(0.8, 3, 1.5)
-)
-grid.arrange(..., widths = c(1,1,1,1), ...)
+
 # 1. Setup ----
+
+
 ## 1.1 Packages and Libraries ----
 # install.packages(c("tidyverse", "ggplot2", "dplyr", "corrplot", "caret", "pROC"))
+
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
 library(corrplot)
 library(caret)
 library(pROC)
+
+
 ## 1.2 CSV-Dateien Anbindung und Umbenennung Spalten und daten kombinierren----
 library(tidyverse)
 library(dplyr)
+
 # Read your train/test CSVs
 train_data <- read.csv("bloodtrain.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
 test_data  <- read.csv("bloodtest.csv",  header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
 # Rename columns (to have consistent readable names with spaces)
 colnames(train_data) <- c(
-"ID",
-"Monate Letzte Spende",
-"Anzahl Spenden",
-"Gesamtvolumen",
-"Monate Erste Spende",
-"Spende Maerz 2007"
+  "ID",
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende",
+  "Spende Maerz 2007"
 )
+
 colnames(test_data) <- c(
-"ID",
-"Monate Letzte Spende",
-"Anzahl Spenden",
-"Gesamtvolumen",
-"Monate Erste Spende"
+  "ID",
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende"
 )
+
 # Mark 'Dataset' so we know which rows are Train vs. Test
 train_data$Dataset <- "Train"
 test_data$Dataset  <- "Test"
+
 # If your test data lacks the target column:
 #   test_data$`Spende Maerz 2007` <- NA
 # but for the boxplots, we only need the numeric columns + "Dataset", so it's okay.
+
+
 # 2) COMBINE INTO ONE DATA FRAME (“combined_data”) FOR YOUR BOXPLOTS
+
 # We’ll just keep the columns we want for the 4 boxplots + "Dataset"
 combined_data <- bind_rows(
-select(
-train_data,
-`Monate Letzte Spende`,
-`Anzahl Spenden`,
-Gesamtvolumen,
-`Monate Erste Spende`,
-Dataset
-),
-select(
-test_data,
-`Monate Letzte Spende`,
-`Anzahl Spenden`,
-Gesamtvolumen,
-`Monate Erste Spende`,
-Dataset
+  select(
+    train_data,
+    `Monate Letzte Spende`,
+    `Anzahl Spenden`,
+    Gesamtvolumen,
+    `Monate Erste Spende`,
+    Dataset
+  ),
+  select(
+    test_data,
+    `Monate Letzte Spende`,
+    `Anzahl Spenden`,
+    Gesamtvolumen,
+    `Monate Erste Spende`,
+    Dataset
+  )
 )
-)
+
 ## 1.3 Erste Zeilen anzeigen ----
 head(train_data)
 head(test_data)
+
+
 # 2. Datenverständnis ----
+
 ## 2.1 Struktur & fehlende Werte ----
 str(train_data)
 str(test_data)
+
 # Fehlende Werte pro Spalte
 colSums(is.na(train_data))
 colSums(is.na(test_data))
+
+
 ## 2.2 Duplikate prüfen ----
 duplicated_rows <- duplicated(train_data)
 if(any(duplicated_rows)) {
-print("Gefundene Duplikate:")
-print(train_data[duplicated_rows, ])
+  print("Gefundene Duplikate:")
+  print(train_data[duplicated_rows, ])
 } else {
-print("Keine Duplikate gefunden.")
+  print("Keine Duplikate gefunden.")
 }
+
+
+
+
+
 #################################################################################
 ## Folie 4: Boxplot Verleich der Trainings- und Testdaten ----
+
 # 4 Boxplots (oben) + lila Kommentarbox (unten) + Main Title oben
+
+
 # Wir erstellen ein A4 Querformat für eine Prästenation.
 # Die seite hat den Grunton violett (#7F3FBF)
 # Die Schriften aller Daten sind weiss und auch die Rahmen
+
 # Wir erstellen ein Präsentationsrasater:
+
 # Wir legen 3 Zeilen x 4 Spalten an:
+
 #   Zeile 1: Folienüberschrift: "
-# "Vergleich der Trainings- und Testdaten", Grösse 24 Punkt umrandet weiss
+# "Vergleich der Trainings- und Testdaten", Grösse 24 Punkt umrandet weiss 
 # (weisse Schrift, Weisser Rahmen da ja A4 Blatt violett)
-# Zentriert
+# Zentriert  
+
+
 #   Zeile 2: Boxplot (4 kombinierte einzelplots)
 # die wir erstellen wollen. Der Die überschriften "Wert" und "Datensatz" weglassen
 # Subplots 1,2,3,4 (jeweils 1 Boxplot)
-# Jeweils links und rechts der Seite 15 Zeichen platz lassen (Flächte bleibt violett)
+# Jeweils links und rechts der Seite 15 Zeichen platz lassen (Flächte bleibt violett)  
+
 #   Zeile 3:lila Kasten mit Erkenntnissen und Schlussfolgerungen
 # Text: "Erkenntnisse" in weiss, 1.4 fach, fett, links oben
 #Subplot 5,5,5,5 (ein großer lila Kasten)
+
+
+
+
 # KOMPLETTES BEISPIEL
 # - 3 Zeilen × 4 Spalten Layout
 # - Zeile 1: Titel (Panel 1,1,1,1)
@@ -145,222 +138,275 @@ print("Keine Duplikate gefunden.")
 # - Zeile 3: Lila Kommentarbox (Panel 6,6,6,6)
 #
 # Wichtig: wir rufen layout() NUR EINMAL, und zeichen alle Boxplots
-# in der Reihenfolge, die layout(...) vorgibt.
+# in der Reihenfolge, die layout(...) vorgibt. 
+
+
 # Falls Du ein "reines" A4 Querformat willst, rufe z.B.:
 # pdf("boxplot_annot_a4quer.pdf", width=11.69, height=8.27)
 # # ... Code ...
 # dev.off()
+
+
 # 1) Layout definieren (3×4) ---
+
 layout(
-matrix(c(
-1,1,1,1,   # Panel 1 => Titel über 4 Spalten
-2,3,4,5,   # Panels 2..5 => 4 Boxplots
-6,6,6,6    # Panel 6 => Kommentarbox unten über 4 Spalten
-), nrow=3, byrow=TRUE),
-#heights = c(1.0, 3.5, 1.3)  # Erste Zeile: 1.0 Einheiten, zweite: 3.5, dritte: 1.3
-heights = c(1.0, 3.5, 2.5)  # Erste Zeile: 1.0 Einheiten, zweite: 3.5, dritte: 1.3
+  matrix(c(
+    1,1,1,1,   # Panel 1 => Titel über 4 Spalten
+    2,3,4,5,   # Panels 2..5 => 4 Boxplots
+    6,6,6,6    # Panel 6 => Kommentarbox unten über 4 Spalten
+  ), nrow=3, byrow=TRUE),
+  #heights = c(1.0, 3.5, 1.3)  # Erste Zeile: 1.0 Einheiten, zweite: 3.5, dritte: 1.3
+  heights = c(1.0, 3.5, 2.5)  # Erste Zeile: 1.0 Einheiten, zweite: 3.5, dritte: 1.3
 )
+
+
 # 1) GLOBALE Farb/Schrift-Einstellungen ----
+
 par(
-bg       = "black",   # Hintergrund des A4 Blattes
-fg       = "blue",
-col.axis = "white",
-col.lab  = "white",
-col.main = "white"
+  bg       = "black",   # Hintergrund des A4 Blattes
+  fg       = "blue",      
+  col.axis = "white",
+  col.lab  = "white",
+  col.main = "white"
 )
+
 # Panel 1 => Titel ----
+
 par(mar=c(2, # Hier wird der rand
-2, #
-2,
-2
+          2, #   
+          2,
+          2
 )) # kein Rand
 plot.new()
 usr <- par("usr")
 # Rechteck in violett (evtl. überflüssig, da bg=violett):
 rect(usr[1], usr[3], usr[2], usr[4], col="#7F3FBF", border=NA)
+
 # Großer weißer Text zentriert
 title_str <- "Vergleich der Trainings- und Testdaten"
 text(
-x=0.5, y=0.5,
-labels=title_str,
-col="white",
-cex=5,        # Schrifthöhe
-font=2,         # fett
-adj=c(0.5,0.5)  # zentriert
+  x=0.5, y=0.5,
+  labels=title_str,
+  col="white",
+  cex=5,        # Schrifthöhe
+  font=2,         # fett
+  adj=c(0.5,0.5)  # zentriert
 )
+
+
 # Panels 2..5 => 4 Boxplots ----
+
+
+
+
 # Panel 2 (Boxplot 1)
 par(mar=c(3,3,2,1))
 boxplot(
-`Monate Letzte Spende` ~ Dataset,
-data   = combined_data,
-notch  = TRUE,
-col    = c("red","blue"),
-border = "white",
-main   = "Monate Letzte Spende",
-xlab   = "",
-ylab   = ""
+  `Monate Letzte Spende` ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Monate Letzte Spende",
+  xlab   = "",
+  ylab   = ""
 )
+
 # Panel 3 (Boxplot 2)
 par(mar=c(3,3,2,1))
 boxplot(
-`Anzahl Spenden` ~ Dataset,
-data   = combined_data,
-notch  = TRUE,
-col    = c("red","blue"),
-border = "white",
-main   = "Anzahl Spenden",
-xlab   = "",
-ylab   = ""
+  `Anzahl Spenden` ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Anzahl Spenden",
+  xlab   = "",
+  ylab   = ""
 )
+
 # Panel 4 (Boxplot 3)
 par(mar=c(3,3,2,1))
 boxplot(
-Gesamtvolumen ~ Dataset,
-data   = combined_data,
-notch  = TRUE,
-col    = c("red","blue"),
-border = "white",
-main   = "Gesamtvolumen",
-xlab   = "",
-ylab   = ""
+  Gesamtvolumen ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Gesamtvolumen",
+  xlab   = "",
+  ylab   = ""
 )
+
 # Panel 5 (Boxplot 4)
 par(mar=c(3,3,2,1))
 boxplot(
-`Monate Erste Spende` ~ Dataset,
-data   = combined_data,
-notch  = TRUE,
-col    = c("red","blue"),
-border = "white",
-main   = "Monate Erste Spende",
-xlab   = "",
-ylab   = ""
+  `Monate Erste Spende` ~ Dataset,
+  data   = combined_data,
+  notch  = TRUE,
+  col    = c("red","blue"),
+  border = "white",
+  main   = "Monate Erste Spende",
+  xlab   = "",
+  ylab   = ""
 )
+
+
 # Panel 6 => Kommentarbox unten ----
+
 par(mar = c(2, 2, 2, 2))
 plot.new()
 usr <- par("usr")
+
 # Rotes Rechteck als Hintergrund:
 rect(
-xleft   = usr[1],
-ybottom = usr[3],
-xright  = usr[2],
-ytop    = usr[4],
-col     = "red",
-border  = NA
+  xleft   = usr[1],
+  ybottom = usr[3],
+  xright  = usr[2],
+  ytop    = usr[4],
+  col     = "red",
+  border  = NA
 )
+
 # Weißer Text: "Erkenntnisse"
 text(
-x     = 0.02,
-y     = 0.80,
-labels= "Erkenntnisse",
-col   = "white",
-cex   = 2.4,
-font  = 2,
-adj   = c(0, 0.5)
+  x     = 0.02, 
+  y     = 0.80,
+  labels= "Erkenntnisse",
+  col   = "white", 
+  cex   = 2.4, 
+  font  = 2, 
+  adj   = c(0, 0.5)
 )
+
 text(
-x     = 0.02,
-y     = 0.55,
-labels= paste(
-" • Verteilungen der Variablen sind nicht unterschiedlich für Trainings- und Testdaten\n",
-"• Kerben der Boxen überlappen\n",
-"• Variabilität ist im Testdatensatz teilweise z. B. bei \"Anzahl Spenden\" höher."
-),
-col   = "white",
-cex   = 1.8,
-adj   = c(0, 0.5)
+  x     = 0.02, 
+  y     = 0.55,
+  labels= paste(
+    " • Verteilungen der Variablen sind nicht unterschiedlich für Trainings- und Testdaten\n",
+    "• Kerben der Boxen überlappen\n",
+    "• Variabilität ist im Testdatensatz teilweise z. B. bei \"Anzahl Spenden\" höher."
+  ),
+  col   = "white", 
+  cex   = 1.8, 
+  adj   = c(0, 0.5)
 )
+
 # Weißer Text: "Schlussfolgerung"
 text(
-x     = 0.02,
-y     = 0.15,
-labels= "Schlussfolgerung\n",
-col   = "white",
-cex   = 2.4,
-font  = 2,
-adj   = c(0, 0.5)
+  x     = 0.02, 
+  y     = 0.15,
+  labels= "Schlussfolgerung\n",
+  col   = "white", 
+  cex   = 2.4, 
+  font  = 2, 
+  adj   = c(0, 0.5)
 )
+
 text(
-x     = 0.02,
-y     = 0.05,
-labels= paste(
-"Man kann annehmen, dass Test- und Trainingsdaten Stichproben aus derselben Population sind.\n",
-""
-),
-col   = "white",
-cex   = 1.8,
-adj   = c(0, 0.5)
+  x     = 0.02, 
+  y     = 0.05,
+  labels= paste(
+    "Man kann annehmen, dass Test- und Trainingsdaten Stichproben aus derselben Population sind.\n",
+    ""
+  ),
+  col   = "white", 
+  cex   = 1.8,
+  adj   = c(0, 0.5)
 )
+
+
+
+
 #################################################################################
 # Folie 5: Histogramme der Zielvariable ----
+
+
 ## R-Skript: "Folie": Vergleich der Verteilungen (Train vs. Test)
 ##            + Ein großer Titel oben (violette Leiste)
 ##            + 4 Histogramme nebeneinander
 ##            + Balkendiagramm (Klassenverteilung) unten links
 ##            + Kommentarkasten unten rechts
+
+
 ## 1) BENÖTIGTE PAKETE ----
 # install.packages(c("tidyverse","ggplot2","dplyr","gridExtra"))
 library(tidyverse)
 library(gridExtra)  # für grid.arrange, tableGrob etc.
 library(grid)       # für grid.rect, grid.text
+
+
 ## 3) EINZELNE PLOTS DEFINIEREN ----
 ## 3.1) Histogramm 1: Monate Letzte Spende
 p1 <- ggplot(combined_data, aes(x=`Monate Letzte Spende`, fill=Dataset)) +
-geom_histogram(binwidth=1, position="dodge", color="black") +
-scale_fill_manual(values=c("Train"="blue","Test"="green")) +
-labs(title="Monate Letzte Spende", x="Monate", y="Frequenz") +
-theme_minimal()
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Monate Letzte Spende", x="Monate", y="Frequenz") +
+  theme_minimal()
+
 ## 3.2) Histogramm 2: Anzahl Spenden
 p2 <- ggplot(combined_data, aes(x=`Anzahl Spenden`, fill=Dataset)) +
-geom_histogram(binwidth=1, position="dodge", color="black") +
-scale_fill_manual(values=c("Train"="blue","Test"="green")) +
-labs(title="Anzahl Spenden", x="Anzahl", y="Frequenz") +
-theme_minimal()
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Anzahl Spenden", x="Anzahl", y="Frequenz") +
+  theme_minimal()
+
 ## 3.3) Histogramm 3: Gesamtvolumen
 p3 <- ggplot(combined_data, aes(x=Gesamtvolumen, fill=Dataset)) +
-geom_histogram(binwidth=500, position="dodge", color="black") +
-scale_fill_manual(values=c("Train"="blue","Test"="green")) +
-labs(title="Gesamtvolumen", x="Volumen", y="Frequenz") +
-theme_minimal()
+  geom_histogram(binwidth=500, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Gesamtvolumen", x="Volumen", y="Frequenz") +
+  theme_minimal()
+
 ## 3.4) Histogramm 4: Monate Erste Spende
 p4 <- ggplot(combined_data, aes(x=`Monate Erste Spende`, fill=Dataset)) +
-geom_histogram(binwidth=5, position="dodge", color="black") +
-scale_fill_manual(values=c("Train"="blue","Test"="green")) +
-labs(title="Monate Erste Spende", x="Monate", y="Frequenz") +
-theme_minimal()
+  geom_histogram(binwidth=5, position="dodge", color="black") +
+  scale_fill_manual(values=c("Train"="blue","Test"="green")) +
+  labs(title="Monate Erste Spende", x="Monate", y="Frequenz") +
+  theme_minimal()
+
 ## 3.5) Balkendiagramm der Zielvariable (Train)
 p5 <- ggplot(train_data, aes(x=factor(`Spende Maerz 2007`), fill="Train")) +
-geom_bar(color="black") +
-scale_fill_manual(values=c("Train"="blue")) +
-scale_x_discrete(labels=c("0"="nein","1"="ja")) +
-labs(
-title="Klassenverteilung (Spende im März 2007, Trainingsdaten)",
-x="Klasse", y="Anzahl"
-) +
-theme_minimal() +
-theme(legend.position="none")
+  geom_bar(color="black") +
+  scale_fill_manual(values=c("Train"="blue")) +
+  scale_x_discrete(labels=c("0"="nein","1"="ja")) +
+  labs(
+    title="Klassenverteilung (Spende im März 2007, Trainingsdaten)",
+    x="Klasse", y="Anzahl"
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
+
 ## 4) "TITEL"-GROB ERSTELLEN ----
+
+
 title_grob <- textGrob(
-"Vergleich Verteilungen Trainings- und Testdaten",
-gp = gpar(fontsize=32, col="grey", fontface="bold")  # große weiße Schrift
+  "Vergleich Verteilungen Trainings- und Testdaten",
+  gp = gpar(fontsize=32, col="grey", fontface="bold")  # große weiße Schrift
 )
+
 title_bg <- rectGrob(
-gp=gpar(fill="#7F3FBF", col=NA)  # violette Rechteckfläche
+  gp=gpar(fill="#7F3FBF", col=NA)  # violette Rechteckfläche
 )
+
 # Wir kombinieren das Rechteck + Titeltext mit "grobTree"
-title_panel <- grobTree(title_bg,
-textGrob("",
-x=unit(0,"npc"), y=unit(0,"npc")),
-title_grob)
+title_panel <- grobTree(title_bg, 
+                        textGrob("",
+                                 x=unit(0,"npc"), y=unit(0,"npc")), 
+                        title_grob)
+
+
 ## 5) "KOMMENTAR"-GROB ERSTELLEN (Erkenntnisse-Box) ----
+
+
 comment_bg <- rectGrob(
-gp=gpar(fill=rgb(1,1,1,0.15), col="black")                                    # Rahmenfarbe Box
-# z.B. halb-durchsichtiges Weiß oder so; anpassbar
+  gp=gpar(fill=rgb(1,1,1,0.15), col="black")                                    # Rahmenfarbe Box
+  # z.B. halb-durchsichtiges Weiß oder so; anpassbar
 )
+
 comment_text <- textGrob(
-"Erkenntnisse\n
+  "Erkenntnisse\n
 • Monate Letzte Spende: Verteilungen weitgehend ähnlich \n
 • Anzahl Spenden: Im Testdatensatz weniger hohe Spenderzahlen\n
 • Gesamtvolumen: tendenziell kleinere Werte im Test\n
@@ -370,143 +416,175 @@ Schlussfolgerung\n
 - Möglicherweise leichte Stichprobendifferenz \n
 - Modell sollte train/test-Shift abfedern können
 ",
-x=0.02, y=0.98, just=c("left","top"),
-gp=gpar(col="black", fontsize=14, fontface="plain")                           # Schriftfarbe Box
+  x=0.02, y=0.98, just=c("left","top"),
+  gp=gpar(col="black", fontsize=14, fontface="plain")                           # Schriftfarbe Box
 )
+
 comment_panel <- grobTree(comment_bg, comment_text)
+
+
 ## 6) DIE "FERTIGE FOLIE" MIT grid.arrange ----
+
+
 # Wir bauen 3 Zeilen:
 # Zeile A: Großer Titel
 # Zeile B: 4 Plots nebeneinander
 # Zeile C: Links Balkendiagramm p5, rechts der Kommentar
+
 ###############################################################################
 ## KAPITEL 1: PAKETE & SETUP
 ###############################################################################
+
 library(tidyverse)
 library(gridExtra)  # für grid.arrange
 library(grid)       # für rectGrob, textGrob etc.
+
 # Wir gehen davon aus, dass du train_data und test_data eingelesen hast
 # und combined_data (train+test) verfügbar ist.
+
 ###############################################################################
 ## KAPITEL 2: HISTOGRAMME DEFINIEREN
 ##    - p1: Mit Y-Achsenbeschriftung "Frequenz" und Legende (links)
 ##    - p2, p3, p4: Ohne Y-Achsenbeschriftung und ohne Legende
 ###############################################################################
+
 # p1: Histogramm "Monate Letzte Spende"
 #    - Rot = Test, Blau = Train
 #    - Legende links (legend.position="left")
 #    - y="Frequenz"
 p1 <- ggplot(combined_data, aes(x=`Monate Letzte Spende`, fill=Dataset)) +
-geom_histogram(binwidth=1, position="dodge", color="black") +
-scale_fill_manual(values=c("Test"="red","Train"="blue")) +
-labs(
-title="Monate Letzte Spende",
-x="Monate",
-y="Frequenz"
-) +
-theme_minimal() +
-theme(legend.position="left")
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Monate Letzte Spende",
+    x="Monate",
+    y="Frequenz"
+  ) +
+  theme_minimal() +
+  theme(legend.position="left")
+
 # p2: Histogramm "Anzahl Spenden"
 #    - KEINE Legende, KEINE Y-Achsenbeschriftung
 p2 <- ggplot(combined_data, aes(x=`Anzahl Spenden`, fill=Dataset)) +
-geom_histogram(binwidth=1, position="dodge", color="black") +
-scale_fill_manual(values=c("Test"="red","Train"="blue")) +
-labs(
-title="Anzahl Spenden",
-x="Anzahl",
-y=NULL
-) +
-theme_minimal() +
-theme(legend.position="none")
+  geom_histogram(binwidth=1, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Anzahl Spenden",
+    x="Anzahl",
+    y=NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
 # p3: Histogramm "Gesamtvolumen"
 #    - KEINE Legende, KEINE Y-Achsenbeschriftung
 p3 <- ggplot(combined_data, aes(x=Gesamtvolumen, fill=Dataset)) +
-geom_histogram(binwidth=500, position="dodge", color="black") +
-scale_fill_manual(values=c("Test"="red","Train"="blue")) +
-labs(
-title="Gesamtvolumen",
-x="Volumen",
-y=NULL
-) +
-theme_minimal() +
-theme(legend.position="none")
+  geom_histogram(binwidth=500, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Gesamtvolumen",
+    x="Volumen",
+    y=NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
 # p4: Histogramm "Monate Erste Spende"
 #    - KEINE Legende, KEINE Y-Achsenbeschriftung
 p4 <- ggplot(combined_data, aes(x=`Monate Erste Spende`, fill=Dataset)) +
-geom_histogram(binwidth=5, position="dodge", color="black") +
-scale_fill_manual(values=c("Test"="red","Train"="blue")) +
-labs(
-title="Monate Erste Spende",
-x="Monate",
-y=NULL
-) +
-theme_minimal() +
-theme(legend.position="none")
+  geom_histogram(binwidth=5, position="dodge", color="black") +
+  scale_fill_manual(values=c("Test"="red","Train"="blue")) +
+  labs(
+    title="Monate Erste Spende",
+    x="Monate",
+    y=NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
 ###############################################################################
 ## KAPITEL 3: BALKENDIAGRAMM p5 (unten links)
 ###############################################################################
+
 # p5: Balkendiagramm für "Spende Maerz 2007" im Trainingsdatensatz
 #    - Nur blau (Train)
 #    - Keine Legende
 p5 <- ggplot(train_data, aes(x=factor(`Spende Maerz 2007`), fill="Train")) +
-geom_bar(color="black") +
-scale_fill_manual(values=c("Train"="blue")) +
-scale_x_discrete(labels=c("0"="nein","1"="ja")) +
-labs(
-title="Klassenverteilung (Spende im März 2007, Trainingsdaten)",
-x="Klasse",
-y="Anzahl"
-) +
-theme_minimal() +
-theme(legend.position="none")
+  geom_bar(color="black") +
+  scale_fill_manual(values=c("Train"="blue")) +
+  scale_x_discrete(labels=c("0"="nein","1"="ja")) +
+  labs(
+    title="Klassenverteilung (Spende im März 2007, Trainingsdaten)",
+    x="Klasse",
+    y="Anzahl"
+  ) +
+  theme_minimal() +
+  theme(legend.position="none")
+
 ###############################################################################
 ## KAPITEL 4: KOMMENTARBOX RECHTS (Erkenntnisse und Schlussfolgerung)
 ###############################################################################
+
 # "comment_bg": halb-transparentes weißes Rechteck
 comment_bg <- rectGrob(
-gp=gpar(fill=rgb(1,1,1,0.15), col="white")
+  gp=gpar(fill=rgb(1,1,1,0.15), col="white")
 )
+
 # "comment_text": grüner Text mit Bullet-Points
 comment_text <- textGrob(
-"Erkenntnisse\n• Monate Letzte Spende: Verteilungen weitgehend ähnlich\n• Anzahl Spenden: Im Testdatensatz weniger hohe Spenderzahlen\n• Gesamtvolumen: tendenziell kleinere Werte im Test\n• Monate Erste Spende: evtl. andere Historie\n\nSchlussfolgerung\n- Möglicherweise leichte Stichprobendifferenz\n- Modell sollte train/test-Shift abfedern können",
-x=0.02, y=0.98, just=c("left","top"),
-gp=gpar(col="black", fontsize=14)
+  "Erkenntnisse\n• Monate Letzte Spende: Verteilungen weitgehend ähnlich\n• Anzahl Spenden: Im Testdatensatz weniger hohe Spenderzahlen\n• Gesamtvolumen: tendenziell kleinere Werte im Test\n• Monate Erste Spende: evtl. andere Historie\n\nSchlussfolgerung\n- Möglicherweise leichte Stichprobendifferenz\n- Modell sollte train/test-Shift abfedern können",
+  x=0.02, y=0.98, just=c("left","top"),
+  gp=gpar(col="black", fontsize=14)
 )
+
 comment_panel <- grobTree(comment_bg, comment_text)
+
 ###############################################################################
 ## KAPITEL 5: TITEL-PANEL OBEN
 ###############################################################################
+
 title_grob <- textGrob(
-"Vergleich Verteilungen Trainings- und Testdaten",
-gp = gpar(fontsize=32, col="white", fontface="bold")
+  "Vergleich Verteilungen Trainings- und Testdaten",
+  gp = gpar(fontsize=32, col="white", fontface="bold")
 )
 title_bg   <- rectGrob(gp=gpar(fill="#7F3FBF", col=NA))
 title_panel <- grobTree(title_bg, title_grob)
+
 ###############################################################################
 ## KAPITEL 6: ZUSAMMENSETZEN DES GESAMT-PLOTS MIT grid.arrange
 ###############################################################################
+
 grid.arrange(
-# Reihenfolge der Panels:
-#  1) = title_panel
-#  2) = p1 (mit Legende & y=Frequenz)
-#  3) = p2
-#  4) = p3
-#  5) = p4
-#  6) = p5 (Balkendiagramm)
-#  7) = comment_panel (Box)
-title_panel,
-p1,
-p2,
-p3,
-p4,
-p5,
-comment_panel,
-# Layout: 3 Zeilen, 4 Spalten
-layout_matrix = rbind(
-c(1,1,1,1),   # Zeile 1 => Titel
-c(2,3,4,5),   # Zeile 2 => 4 Histogramme
-c(6,6,7,7)    # Zeile 3 => p5 links, Kommentar rechts
-),
-nrow=3,
-heights=c(0.8, 3, 1.5)
+  # Reihenfolge der Panels:
+  #  1) = title_panel
+  #  2) = p1 (mit Legende & y=Frequenz)
+  #  3) = p2
+  #  4) = p3
+  #  5) = p4
+  #  6) = p5 (Balkendiagramm)
+  #  7) = comment_panel (Box)
+  
+  title_panel,
+  p1,
+  p2,
+  p3,
+  p4,
+  p5,
+  comment_panel,
+  
+  # Layout: 3 Zeilen, 4 Spalten
+  layout_matrix = rbind(
+    c(1,1,1,1),   # Zeile 1 => Titel
+    c(2,3,4,5),   # Zeile 2 => 4 Histogramme
+    c(6,6,7,7)    # Zeile 3 => p5 links, Kommentar rechts
+  ),
+  nrow=3,
+  heights=c(0.8, 3, 1.5)
 )
+
+
+
+
+
+
+
