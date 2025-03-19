@@ -642,20 +642,13 @@ Ein Pairs-Plot zeigt die Beziehungen zwischen den numerischen Variablen. Anschli
 #     Spaltennamen (z.B. "Monate Letzte Spende", "Anzahl Spenden").
 #   - Wir bilden "Spendetakt" = (Anzahl Spenden) / (Monate Letzte Spende).
 #   - Division durch 0 vermeiden => Zeilen, wo "Monate Letzte Spende" == 0, => NA.
-#   - Danach: Pairs-Plot (links) & Korrelationsmatrix (rechts) in einem gemeinsamen Layout.
+#   - Statt zwei separaten Plots erzeugen wir einen kombinierten Plot mittels
+#     GGally::ggpairs, der in seinen Panels sowohl Streudiagramme als auch 
+#     Korrelationskoeffizienten darstellt.
 ##############################################################################
 
 # 1) Datensatz neu einlesen
-#    Wir gehen davon aus, dass 'bloodtrain.csv' die folgenden Spalten hat:
-#      "ID", 
-#      "Monate Letzte Spende", 
-#      "Anzahl Spenden", 
-#      "Gesamtvolumen", 
-#      "Monate Erste Spende",
-#      "Spende Maerz 2007"
 train_data <- read.csv("bloodtrain.csv", stringsAsFactors = FALSE)
-
-# Zur Sicherheit: Gleiche Namensgebung wie in den vorherigen Plots
 colnames(train_data) <- c(
   "ID",
   "Monate Letzte Spende",
@@ -666,7 +659,6 @@ colnames(train_data) <- c(
 )
 
 # 2) 0 -> NA in "Monate Letzte Spende"
-#    Prüfen, ob es überhaupt Werte == 0 gibt. Nur dann ersetzen wir.
 has_zero <- any(train_data$`Monate Letzte Spende` == 0, na.rm = TRUE)
 if (has_zero) {
   train_data$`Monate Letzte Spende`[train_data$`Monate Letzte Spende` == 0] <- NA
@@ -675,15 +667,14 @@ if (has_zero) {
 # 3) Neuer Prädiktor "Spendetakt" = (Anzahl Spenden) / (Monate Letzte Spende)
 train_data$Spendetakt <- train_data$`Anzahl Spenden` / train_data$`Monate Letzte Spende`
 
-# 4) 2-spaltiges Grafiklayout
-par(
-  mfrow = c(1, 2),
-  oma   = c(0, 0, 2, 0),
-  mar   = c(4, 4, 4, 1)
-)
+# 4) Umwandlung von "Spende Maerz 2007" in Faktor zur Farbgebung
+train_data$`Spende Maerz 2007` <- as.factor(train_data$`Spende Maerz 2007`)
 
-# 5) LINKS: Pairs-Plot
-#    Wir wählen die Spalten, alle haben Leerzeichen wie in den früheren Abschnitten:
+# 5) Kombinierter Plot mit GGally::ggpairs erzeugen
+library(GGally)   # Falls nicht installiert: install.packages("GGally")
+library(ggplot2)  # ggplot2 wird für Anpassungen genutzt
+
+# Auswahl der numerischen Variablen, die im Plot erscheinen sollen
 numeric_vars <- c(
   "Monate Letzte Spende",
   "Anzahl Spenden",
@@ -692,53 +683,23 @@ numeric_vars <- c(
   "Spendetakt"
 )
 
-# Farbgebung nach "Spende Maerz 2007": Wir interpretieren 1 => grün, 0 => rot.
-point_colors <- ifelse(train_data$`Spende Maerz 2007` == 1, "green", "red")
+# Erzeugen des kombinierten Plots:
+plot_combined <- ggpairs(
+  train_data,
+  columns = numeric_vars,
+  mapping = aes(color = `Spende Maerz 2007`),
+  upper = list(continuous = wrap("cor", size = 4)),     # Obere Panels: Korrelationskoeffizienten
+  lower = list(continuous = wrap("points", size = 1.5)),  # Untere Panels: Scatterplots
+  diag = list(continuous = wrap("densityDiag", alpha = 0.5)) # Diagonale: Dichtediagramme
+) +
+  scale_color_manual(
+    values = c("0" = "red", "1" = "green")
+  ) +
+  ggtitle("Kombinierter Pairs-Plot inkl. Korrelationsmatrix (mit Spendetakt)") +
+  theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5))
 
-pairs(
-  train_data[, numeric_vars],
-  col       = point_colors,
-  pch       = 16,       # geschlossene Kreise
-  cex       = 1.2,      # Punktgröße
-  font.main = 2,        # Fettschrift für den Titel
-  font.lab  = 2,
-  main      = "Pairs-Plot der Trainingsdaten",
-  cex.main  = 1.4,
-  cex.labels= 1.2
-)
-
-# 6) RECHTS: Korrelationsmatrix (inkl. Spendetakt)
-library(corrplot)  # Falls nicht installiert: install.packages("corrplot")
-
-# Zuerst nur numerische Spalten filtern
-num_data <- train_data[sapply(train_data, is.numeric)]
-
-# Falls "ID" numerisch und unnötig, entfernen wir sie
-if ("ID" %in% names(num_data)) {
-  num_data <- num_data[, !names(num_data) %in% "ID"]
-}
-
-# Korrelation (pairwise.complete.obs => Zeilen mit NA in mind. einer Variable ignorieren)
-cor_matrix <- cor(num_data, use = "pairwise.complete.obs")
-
-# Plot der Korrelationsmatrix
-corrplot(
-  cor_matrix,
-  method      = "color",   # Farbkacheln
-  type        = "upper",   # Nur obere Hälfte
-  tl.col      = "black",
-  tl.srt      = 45,
-  addCoef.col = "black",   # Zahlen in Schwarz
-  number.cex  = 0.8,
-  title       = "Korrelationsmatrix (mit Spendetakt)",
-  mar         = c(0, 0, 2, 0),
-  cex.main    = 1.4,
-  font.main   = 2
-)
-
-# FERTIG: Links Pairs-Plot (mit Leerzeichen in Spaltennamen), 
-#         rechts Korrelationsmatrix. 
-
+# Plot anzeigen
+print(plot_combined)
 
 ```
 

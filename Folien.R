@@ -586,5 +586,197 @@ grid.arrange(
 
 
 
+#################################################################################
+# Folie 6: Pairsplot + Korrelationsmatrix ----
+##############################################################################
+## GESAMTE FOLIE "Trainingsdaten – Beziehung der Variablen" (Screenshot 2)
+##
+##  Layout: 3 Zeilen × 2 Spalten
+##    Zeile 1 (Panel1,1 => breiter Titel-Balken)
+##    Zeile 2 => Pairs-Plot (links) & Korrelationsmatrix (rechts)
+##    Zeile 3 => Box "Erkenntnisse..." (links) & Box "Neuer Prädiktor" (rechts)
+##############################################################################
+
+#### 1) Pakete + Daten einlesen ####
+# Falls noch nicht installiert: install.packages("corrplot")
+library(corrplot)
+
+train_data <- read.csv("bloodtrain.csv", stringsAsFactors = FALSE)
+
+colnames(train_data) <- c(
+  "ID",
+  "Monate Letzte Spende",
+  "Anzahl Spenden",
+  "Gesamtvolumen",
+  "Monate Erste Spende",
+  "Spende Maerz 2007"
+)
+
+# 0 in "Monate Letzte Spende" => NA
+z_rows <- train_data$`Monate Letzte Spende` == 0
+if(any(z_rows, na.rm=TRUE)){
+  train_data$`Monate Letzte Spende`[z_rows] <- NA
+}
+
+# Neuer Prädiktor "Spendetakt"
+train_data$Spendetakt <- with(train_data, `Anzahl Spenden` / `Monate Letzte Spende`)
+
+# Farbgebung: 1 => grün, 0 => rot
+point_colors <- ifelse(train_data$`Spende Maerz 2007` == 1, "green", "red")
+
+# Korrelationsmatrix (nur numerische Variablen, ID entfernen)
+num_data <- train_data[sapply(train_data, is.numeric)]
+if("ID" %in% names(num_data)){
+  num_data <- num_data[, !names(num_data) %in% "ID"]
+}
+cor_matrix <- cor(num_data, use="pairwise.complete.obs")
+
+##############################################################################
+#### 2) layout(...) für das gesamte "Folie"-Layout
+##############################################################################
+layout(
+  matrix(c(
+    1,1,   # Zeile 1 => Panel1 breit (Titel)
+    2,3,   # Zeile 2 => Panel2 (links), Panel3 (rechts)
+    4,5    # Zeile 3 => Panel4 (links), Panel5 (rechts)
+  ), nrow=3, byrow=TRUE),
+  widths  = c(1,1),
+  heights = c(1.2, 4, 2.5)
+)
+
+#### Globale par-Einstellungen für ALLE Panels ####
+par(
+  bg       = "#7F3FBF",  # Violetter "Folie"-Hintergrund
+  fg       = "black",
+  col.lab  = "black",
+  col.axis = "black"
+)
+
+
+##############################################################################
+#### PANEL 1: Titelbalken (Zeile1, Spalten1+2)
+##############################################################################
+par(mar=c(0,0,0,0))  # minimaler Rand
+plot.new()
+usr <- par("usr")
+
+# Weißer Rahmen um den Balken:
+rect(
+  usr[1], usr[3], usr[2], usr[4],
+  col=NA, border="white", lwd=3
+)
+
+text(
+  x=0.5, y=0.5,
+  labels="Trainingsdaten – Beziehung der Variablen",
+  col="white", font=2, cex=2.5
+)
+
+
+##############################################################################
+#### PANEL 2: Pairs-Plot (Zeile2, Spalte1)
+##############################################################################
+par(mar=c(4,4,3,1))
+pairs(
+  train_data[, c("Monate Letzte Spende","Anzahl Spenden","Gesamtvolumen","Monate Erste Spende","Spendetakt")],
+  col        = ifelse(train_data$`Spende Maerz 2007`==1, "green","red"),
+  main       = "Pairs-Plot Trainingsdaten",
+  font.main  = 2,
+  cex.main   = 1.4
+)
+
+
+##############################################################################
+#### PANEL 3: Korrelation (Zeile2, Spalte2)
+##############################################################################
+par(mar=c(4,2,3,2))
+corrplot(
+  cor_matrix,
+  method      = "color",
+  type        = "upper",
+  tl.col      = "black",
+  tl.srt      = 45,
+  addCoef.col = "black",
+  number.cex  = 0.9,
+  title       = "Korrelationsmatrix (mit Spendetakt)",
+  mar         = c(0,0,2,0),
+  cex.main    = 1.4,
+  font.main   = 2
+)
+
+##############################################################################
+#### PANEL 4: Box "Erkenntnisse & Schlussfolgerung" (Zeile3, Spalte1)
+##############################################################################
+par(mar=c(0,0,0,0))
+plot.new()
+usr <- par("usr")
+
+# halbtransparentes weißes Rechteck
+rect(
+  usr[1], usr[3], usr[2], usr[4],
+  col=rgb(1,1,1,0.15), border="white", lwd=2
+)
+
+# Titel "Erkenntnisse"
+text(
+  x=0.02, y=0.85, adj=c(0,1),
+  labels="Erkenntnisse",
+  col="white", font=2, cex=1.6
+)
+
+txt_erk <- paste(
+  "• 'Anzahl Spenden' und 'Gesamtvolumen' haben Korrelation 1",
+  "• Korrelation neuer Prädiktor 'Spendetakt' hoch zu 'Anzahl Spenden' & 'Gesamtvolumen'",
+  sep="\n"
+)
+text(
+  x=0.02, y=0.7, adj=c(0,1),
+  labels=txt_erk,
+  col="white", cex=1.2
+)
+
+# Titel "Schlussfolgerung"
+text(
+  x=0.02, y=0.3, adj=c(0,1),
+  labels="Schlussfolgerung",
+  col="white", font=2, cex=1.6
+)
+
+text(
+  x=0.02, y=0.15, adj=c(0,1),
+  labels="• 'Anzahl Spenden' beibehalten und 'Gesamtvolumen' weglassen",
+  col="white", cex=1.2
+)
+
+##############################################################################
+#### PANEL 5: Box "Neuer Prädiktor" (Zeile3, Spalte2)
+##############################################################################
+par(mar=c(0,0,0,0))
+plot.new()
+usr <- par("usr")
+
+rect(
+  usr[1], usr[3], usr[2], usr[4],
+  col=rgb(1,1,1,0.15), border="white", lwd=2
+)
+
+text(
+  x=0.02, y=0.85, adj=c(0,1),
+  labels="Neuer Prädiktor 'Spendetakt'",
+  col="white", font=2, cex=1.4
+)
+
+text(
+  x=0.02, y=0.65, adj=c(0,1),
+  labels="= 'Anzahl Spenden' / 'Monate Letzte Spende'",
+  col="white", cex=1.2
+)
+
+# FERTIG
+##############################################################################
+
+
+
+
 
 
