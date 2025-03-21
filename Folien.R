@@ -682,7 +682,10 @@ pairs(
   col        = ifelse(train_data$`Spende Maerz 2007`==1, "green","red"),
   main       = "Pairs-Plot Trainingsdaten",
   font.main  = 2,
-  cex.main   = 1.4
+  cex.main   = 1.4,
+  height     = 1.5,
+  width      = 1.5,
+  
 )
 
 
