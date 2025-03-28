@@ -698,6 +698,9 @@ plot_combined <- ggpairs(
   ggtitle("Kombinierter Pairs-Plot inkl. Korrelationsmatrix (mit Spendetakt)") +
   theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5))
 
+
+
+
 # Plot anzeigen
 print(plot_combined)
 

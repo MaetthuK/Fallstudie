@@ -172,11 +172,7 @@ par(
 
 # Panel 1 => Titel ----
 
-par(mar=c(2, # Hier wird der rand
-          2, #   
-          2,
-          2
-)) # kein Rand
+par(mar=c(1, 1, 1, 1)) 
 plot.new()
 usr <- par("usr")
 # Rechteck in violett (evtl. überflüssig, da bg=violett):
